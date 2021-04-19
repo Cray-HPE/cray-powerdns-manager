@@ -20,6 +20,8 @@ import (
 )
 
 var (
+	baseDomain = flag.String("base_domain", "shasta.dev.cray.com",
+		"Base master domain from which to build all other records on top of")
 	slsURL = flag.String("sls_url", "http://cray-sls",
 		"System Layout Service URL")
 	hsmURL = flag.String("hsm_url", "http://cray-smd",
@@ -49,6 +51,9 @@ var (
 	APIServer *http.Server = nil
 
 	trueUpShutdown chan bool
+	trueUpRunNow chan bool
+	trueUpInProgress bool
+	trueUpMtx sync.Mutex
 )
 
 func setupLogging() {
@@ -102,6 +107,7 @@ func main() {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
 	trueUpShutdown = make(chan bool)
+	trueUpRunNow = make(chan bool)
 
 	go func() {
 		<-c

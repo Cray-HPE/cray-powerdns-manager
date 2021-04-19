@@ -11,8 +11,8 @@ info:
                  2) To gain insight into status.
 
 tags:
-  - name:        "Actions"
-    description: "Endpoints for performing actions with the manager service."
+  - name:        "Manager"
+    description: "Endpoints for interacting with the manager service."
 
 servers:
   - url:         https://api-gw-service-nmn.local/apis/powerdns-manager/v1
@@ -21,6 +21,20 @@ servers:
     description: Access from inside the mesh.
 
 paths:
+  /manager/jobs:
+    post:
+      tags:
+        - Manager
+      summary: Endpoint for interacting directly with the manager process.
+      description: Allows for the command and control of the manager process.
+      responses:
+        '204':
+          description: >-
+                       The true up loop was successfully woken up.
+        '503':
+          description: >-
+                       The true up loop is already running. Please try again later.
+
   /liveness:
     get:
       tags:

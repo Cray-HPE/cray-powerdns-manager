@@ -20,6 +20,18 @@ func setupAPI() {
 		c.JSON(http.StatusNoContent, nil)
 	})
 
+	// True up loop control.
+	apiV1.POST("/manager/jobs", func(c *gin.Context) {
+		trueUpMtx.Lock()
+		if trueUpInProgress {
+			c.JSON(http.StatusServiceUnavailable, nil)
+		} else {
+			trueUpRunNow <- true
+			c.JSON(http.StatusNoContent, nil)
+		}
+		trueUpMtx.Unlock()
+	})
+
 	// Run the router.
 	srv := &http.Server{
 		Addr: ":8080",

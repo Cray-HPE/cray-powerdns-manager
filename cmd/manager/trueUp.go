@@ -11,13 +11,25 @@ func trueUpDNS() {
 	defer WaitGroup.Done()
 
 	for Running {
+		trueUpMtx.Lock()
+		trueUpInProgress = true
+		trueUpMtx.Unlock()
+
 		logger.Debug("Running true up loop.")
 
 		// Useful stuff.
+		time.Sleep(5 * time.Second)
+
+		trueUpMtx.Lock()
+		trueUpInProgress = false
+		trueUpMtx.Unlock()
 
 		select {
 		case <-trueUpShutdown:
 			break
+		case <-trueUpRunNow:
+			// For those impatient type.
+			continue
 		case <-time.After(time.Duration(*trueUpSleepInterval) * time.Second):
 			continue
 		}

@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 	"net/http"
 )
 
@@ -20,5 +21,22 @@ func setupAPI() {
 	})
 
 	// Run the router.
-	_ = router.Run()
+	srv := &http.Server{
+		Addr: ":8080",
+		Handler: router,
+	}
+
+	go func() {
+		defer WaitGroup.Done()
+
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logger.Panic("Unable to start API server!", zap.Error(err))
+		}
+
+		logger.Info("API Server shutdown.")
+	}()
+
+	logger.Info("API server started.")
+
+	APIServer = srv
 }

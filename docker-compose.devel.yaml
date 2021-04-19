@@ -1,0 +1,11 @@
+version: "3.8"
+
+services:
+  powerdns:
+    build:
+      context:    ./build/powerdns
+      dockerfile: Dockerfile
+    ports:
+    - "9090:80"
+    - "53:53"
+    - "53:53/udp"

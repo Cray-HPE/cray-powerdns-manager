@@ -1,0 +1,109 @@
+openapi: 3.0.0
+info:
+  version:     "1.0.0"
+  title:       "PowerDNS Manager"
+  description: |
+               The PowerDNS manager is reposnsible for keeping in sync all of the DNS records for the entire system.
+               This includes dymaic records like those comfing from DHCP as well as static entries (like gateway or VIP
+               addresses). This API exists for two reasons:
+
+                 1) To trigger manual actions like forcing a true-up run.
+                 2) To gain insight into status.
+
+tags:
+  - name:        "Actions"
+    description: "Endpoints for performing actions with the manager service."
+
+servers:
+  - url:         https://api-gw-service-nmn.local/apis/powerdns-manager/v1
+    description: The production API server. Access from outside the mesh.
+  - url:         http://powerdns-manager/v1
+    description: Access from inside the mesh.
+
+paths:
+  /liveness:
+    get:
+      tags:
+        - cli_ignore
+      summary:     Kubernetes liveness endpoint to monitor service health
+      x-private:   true
+      description: >-
+                   The `liveness` resource works in conjunction with the Kubernetes liveness
+                   probe to determine when the service is no longer responding to
+                   requests.  Too many failures of the liveness probe will result in the
+                   service being shut down and restarted.
+
+
+                   This is primarily an endpoint for the automated Kubernetes system.
+      responses:
+        '204':
+          description: >-
+                       [No Content](http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.5)
+                       Network API call success
+        '405':
+          description: >-
+                       Operation Not Permitted.  For /liveness, only GET operations are allowed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Problem7807'
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem7807'
+
+  /readiness:
+    get:
+      tags:
+        - cli_ignore
+      summary:     Kubernetes readiness endpoint to monitor service health
+      x-private:   true
+      description: >-
+                   The `readiness` resource works in conjunction with the Kubernetes readiness
+                   probe to determine when the service is no longer healthy and able to respond
+                   correctly to requests.  Too many failures of the readiness probe will result
+                   in the traffic being routed away from this service and eventually the service
+                   will be shut down and restarted if in an unready state for too long.
+
+
+                   This is primarily an endpoint for the automated Kubernetes system.
+      responses:
+        '204':
+          description: >-
+                       [No Content](http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.5)
+                       Network API call success
+        '405':
+          description: >-
+                       Operation Not Permitted.  For /readiness, only GET operations are allowed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Problem7807'
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem7807'
+
+components:
+  schemas:
+    Problem7807:
+      description: >-
+                   RFC 7807 compliant error payload.  All fields are optional except the 'type' field.
+      type:        object
+      required:
+        - type
+      properties:
+        type:
+          type:    string
+          example: 'about:blank'
+        detail:
+          type:    string
+          example: Detail about this specific problem occurrence. See RFC7807
+        instance:
+          type:    string
+          example: ''
+        status:
+          type:    number
+          format:  int32
+          example: 400
+        title:
+          type:    string
+          example: 'Description of HTTP Status code, e.g. 400'

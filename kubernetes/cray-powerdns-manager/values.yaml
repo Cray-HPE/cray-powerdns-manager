@@ -1,0 +1,42 @@
+cray-service:
+  type: "Deployment"
+  nameOverride: "cray-powerdns-manager"
+  fullnameOverride: "cray-powerdns-manager"
+  serviceAccountName: "jobs-watcher"
+  replicaCount: 1
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+      - topologyKey: kubernetes.io/hostname
+        labelSelector:
+          matchExpressions:
+            - key: app.kubernetes.io/name
+              operator: In
+              values:
+              - cray-powerdns-manager
+  strategy:
+    type: Recreate
+  containers:
+    cray-powerdns-manager:
+      name: "cray-powerdns-manager"
+      image:
+        repository: "cray/cray-powerdns-manager"
+      ports:
+        - name: http
+          containerPort: 8080
+      livenessProbe:
+        httpGet:
+          port: 8080
+          path: /v1/liveness
+        initialDelaySeconds: 10
+        periodSeconds: 30
+      readinessProbe:
+        httpGet:
+          port: 8080
+          path: /v1/readiness
+        initialDelaySeconds: 15
+        periodSeconds: 30
+  ingress:
+    enabled: true
+    prefix: "/apis/powerdns-manager/"
+    uri: "/"

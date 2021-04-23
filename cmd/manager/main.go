@@ -5,7 +5,7 @@ import (
 	"crypto/tls"
 	"github.com/gin-gonic/gin"
 	"github.com/hashicorp/go-retryablehttp"
-	"github.com/joeig/go-powerdns"
+	"github.com/joeig/go-powerdns/v2"
 	"github.com/namsral/flag"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -22,6 +22,11 @@ import (
 var (
 	baseDomain = flag.String("base_domain", "shasta.dev.cray.com",
 		"Base master domain from which to build all other records on top of")
+	masterServer = flag.String("master_server", "ns1.shasta.dev.cray.com/192.168.53.4",
+		"FQDN/IP of this master DNS server")
+	slaveServers = flag.String("slave_servers", "ns2.shasta.dev.cray.com/192.168.53.5",
+		"Comma separated list of slave DNS FQDNs/IPs")
+
 	slsURL = flag.String("sls_url", "http://cray-sls",
 		"System Layout Service URL")
 	hsmURL = flag.String("hsm_url", "http://cray-smd",
@@ -50,10 +55,12 @@ var (
 
 	APIServer *http.Server = nil
 
-	trueUpShutdown chan bool
-	trueUpRunNow chan bool
+	trueUpShutdown   chan bool
+	trueUpRunNow     chan bool
 	trueUpInProgress bool
-	trueUpMtx sync.Mutex
+	trueUpMtx        sync.Mutex
+
+	token string
 )
 
 func setupLogging() {
@@ -101,13 +108,15 @@ func main() {
 	// Setup logging.
 	setupLogging()
 
+	token = os.Getenv("TOKEN")
+
 	var cancel context.CancelFunc
 	ctx, cancel = context.WithCancel(context.Background())
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
 	trueUpShutdown = make(chan bool)
-	trueUpRunNow = make(chan bool)
+	trueUpRunNow = make(chan bool, 1)
 
 	go func() {
 		<-c
@@ -150,13 +159,16 @@ func main() {
 	httpClient.Logger = newHttpLogger
 
 	// Setup the PowerDNS configuration.
-	pdns = powerdns.NewClient(*pdnsURL, "localhost", map[string]string{"X-API-Key": *pdnsAPIKey}, nil)
+	pdns = powerdns.NewClient(*pdnsURL, "localhost", map[string]string{"X-API-Key": *pdnsAPIKey},
+		httpClient.HTTPClient)
 
 	// Kick off the true up loop.
 	WaitGroup.Add(1)
 	logger.Info("Starting true up loop.")
 	go trueUpDNS()
 
+	// Seed the fist run since we start the loop with the select block.
+	trueUpRunNow <- true
 
 	// We'll spend pretty much the rest of life blocking on the next line.
 	WaitGroup.Wait()

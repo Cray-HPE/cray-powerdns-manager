@@ -1,31 +1,52 @@
 version: "3.8"
 
+networks:
+  pdns:
+    ipam:
+      driver: default
+      config:
+        - subnet: 192.168.53.0/24
+
 services:
-  mariadb:
+  primary-mariadb:
     image: mariadb
     ports:
-    - "3306:3306"
+      - "3306:3306"
     environment:
       MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: powerdns
-      MYSQL_USER: powerdns
-      MYSQL_PASSWORD: powerdns
+      MYSQL_DATABASE:      powerdns
+      MYSQL_USER:          powerdns
+      MYSQL_PASSWORD:      powerdns
+    networks:
+      pdns:
+        ipv4_address: 192.168.53.2
+  secondary-mariadb:
+    image: mariadb
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE:      powerdns
+      MYSQL_USER:          powerdns
+      MYSQL_PASSWORD:      powerdns
+    networks:
+      pdns:
+        ipv4_address: 192.168.53.3
 
-  powerdns:
+  primary-powerdns:
     depends_on:
-      - mariadb
+      - primary-mariadb
     image: psitrax/powerdns:v4.3
+    hostname: ns1
     ports:
       - "53:53"
       - "53:53/udp"
       - "9090:80"
-    links:
-      - mariadb
     environment:
-      MYSQL_HOST: mariadb
-      MYSQL_DB: powerdns
-      MYSQL_USER: powerdns
-      MYSQL_PASS: powerdns
+      MYSQL_HOST:   primary-mariadb
+      MYSQL_DB:     powerdns
+      MYSQL_USER:   powerdns
+      MYSQL_PASS:   powerdns
       MYSQL_DNSSEC: "yes"
     command: [
         "--webserver=yes",
@@ -40,4 +61,49 @@ services:
         "--log-dns-details=yes",
         "--query-logging=yes",
         "--default-soa-edit=INCEPTION-INCREMENT",
+        "--allow-axfr-ips=192.168.53.5/32",
     ]
+    networks:
+      pdns:
+        ipv4_address: 192.168.53.4
+        aliases:
+          - ns1.shasta.dev.cray.com
+  secondary-powerdns:
+    depends_on:
+      - secondary-mariadb
+    image: psitrax/powerdns:v4.3
+    hostname: ns2
+    ports:
+      - "5053:53"
+      - "5053:53/udp"
+      - "9091:80"
+    environment:
+      MYSQL_HOST:   secondary-mariadb
+      MYSQL_DB:     powerdns
+      MYSQL_USER:   powerdns
+      MYSQL_PASS:   powerdns
+      MYSQL_DNSSEC: "yes"
+    command: [
+        "--webserver=yes",
+        "--webserver-address=0.0.0.0",
+        "--webserver-port=80",
+        "--webserver-allow-from=0.0.0.0/0",
+        "--api=yes",
+        "--api-key=cray",
+        "--disable-syslog=yes",
+        "--loglevel=9",
+        "--log-dns-queries=yes",
+        "--log-dns-details=yes",
+        "--query-logging=yes",
+        "--default-soa-edit=INCEPTION-INCREMENT",
+        "--slave=yes",
+        "--master=no",
+        "--slave-cycle-interval=10",
+        "--disable-axfr=yes",
+        "--superslave=yes",
+    ]
+    networks:
+      pdns:
+        ipv4_address: 192.168.53.5
+        aliases:
+          - ns2.shasta.dev.cray.com

@@ -111,7 +111,13 @@ func buildReverseName(cidrParts []string) string {
 	return fmt.Sprintf("%s%s", strings.Join(reverseCIDR, "."), rdnsDomain)
 }
 
-func trueUpReverseZones(networks []sls_common.Network) (reverseZones []*powerdns.Zone, err error) {
+func trueUpReverseZones(networks []sls_common.Network, nameservers []nameserver) (reverseZones []*powerdns.Zone,
+	err error) {
+	var nameserverFQDNs []string
+	for _, nameserver := range nameservers {
+		canonicalName := makeDomainCanonical(nameserver.FQDN)
+		nameserverFQDNs = append(nameserverFQDNs, canonicalName)
+	}
 	for _, network := range networks {
 		for _, ipRange := range network.IPRanges {
 			// Compute the correct name.
@@ -137,6 +143,7 @@ func trueUpReverseZones(networks []sls_common.Network) (reverseZones []*powerdns
 							Name:   &reverseZoneName,
 							Kind:   powerdns.ZoneKindPtr(powerdns.MasterZoneKind),
 							DNSsec: powerdns.Bool(true),
+							Nameservers: nameserverFQDNs,
 						}
 						reverseZone, err = pdns.Zones.Add(reverseZone)
 						if err != nil {
@@ -416,7 +423,10 @@ func rrsetsEqual(a powerdns.RRset, b powerdns.RRset) bool {
 //	1) The RRset doesn't exist at all.
 //	2) The RRset exists but the records are not correct.
 //  3) The RRset exists and shouldn't.
-func trueUpRRSets(rrsets []powerdns.RRset, zone *powerdns.Zone) (didSomething bool) {
+func trueUpRRSets(rrsets []powerdns.RRset, zone *powerdns.Zone) bool {
+	// Main data structure to keep track of the RRsets we actually need to patch.
+	var actionableRRSets powerdns.RRsets
+
 	// To make this process a lot quicker first build up a map of names to RRsets for O(1) lookups later.
 	zoneRRsetMap := make(map[string]powerdns.RRset)
 	desiredRRSetMap := make(map[string]powerdns.RRset)
@@ -437,25 +447,15 @@ func trueUpRRSets(rrsets []powerdns.RRset, zone *powerdns.Zone) (didSomething bo
 		if found {
 			// Case 2 - is the RRSet correct?
 			if !rrsetsEqual(desiredRRset, zoneRRset) {
-				err := pdns.Records.Patch(*zone.Name, &powerdns.RRsets{Sets: []powerdns.RRset{desiredRRset}})
-				if err != nil {
-					patchLogger.Error("Failed to patch RRset!", zap.Error(err))
-				} else {
-					patchLogger.Info("Patched RRset")
-					didSomething = true
-				}
+				actionableRRSets.Sets = append(actionableRRSets.Sets, desiredRRset)
+				patchLogger.Info("RRset exists but is not ideal configuration, adding to patch list.")
 			} else {
 				logger.Debug("RRset already at desired config", zap.Any("zoneRRset", zoneRRset))
 			}
 		} else {
 			// Case 1 - not found, add it.
-			err := pdns.Records.Patch(*zone.Name, &powerdns.RRsets{Sets: []powerdns.RRset{desiredRRset}})
-			if err != nil {
-				patchLogger.Error("Failed to add RRset!", zap.Error(err), zap.Any("zone", zone))
-			} else {
-				patchLogger.Info("Added RRset")
-				didSomething = true
-			}
+			actionableRRSets.Sets = append(actionableRRSets.Sets, desiredRRset)
+			patchLogger.Info("RRset does not exist, adding to patch list.")
 		}
 	}
 
@@ -465,19 +465,24 @@ func trueUpRRSets(rrsets []powerdns.RRset, zone *powerdns.Zone) (didSomething bo
 
 		if !found &&
 			zoneRRset.Type == powerdns.RRTypePtr(powerdns.RRTypeNS) {
-			deleteLogger := logger.With(zap.Any("zoneRRset", zoneRRset))
-
-			err := pdns.Records.Delete(*zone.Name, *zoneRRset.Name, *zoneRRset.Type)
-			if err != nil {
-				deleteLogger.Error("Failed to delete RRset!", zap.Error(err))
-			} else {
-				deleteLogger.Info("Deleted RRset")
-				didSomething = true
-			}
+			zoneRRset.ChangeType = powerdns.ChangeTypePtr(powerdns.ChangeTypeDelete)
+			actionableRRSets.Sets = append(actionableRRSets.Sets, zoneRRset)
+			logger.Info("RRset needs to be removed, adding to patch list.", zap.Any("zoneRRset", zoneRRset))
 		}
 	}
 
-	return
+	if len(actionableRRSets.Sets) > 0 {
+		// Do all the patching (which is additions, changes, and deletes) in one API call...pretty cool.
+		err := pdns.Records.Patch(*zone.Name, &actionableRRSets)
+		if err != nil {
+			logger.Error("Failed to patch RRsets!", zap.Error(err), zap.Any("zone", zone))
+		} else {
+			logger.Info("Patched RRSets")
+			return true
+		}
+	}
+
+	return false
 }
 
 func buildNameserverRRset(nameserver nameserver) powerdns.RRset {
@@ -567,7 +572,7 @@ func trueUpDNS() {
 			logger.Error("Failed to true up master zone!", zap.Error(err))
 			continue
 		}
-		reverseZones, err := trueUpReverseZones(networks)
+		reverseZones, err := trueUpReverseZones(networks, nameServers)
 		if err != nil {
 			logger.Error("Failed to true up reverse zones!", zap.Error(err))
 		}

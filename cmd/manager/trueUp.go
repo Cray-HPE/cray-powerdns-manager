@@ -5,9 +5,11 @@ import (
 	"github.com/joeig/go-powerdns/v2"
 	"github.com/mitchellh/mapstructure"
 	"go.uber.org/zap"
+	"net"
 	"net/http"
 	"reflect"
 	sls_common "stash.us.cray.com/HMS/hms-sls/pkg/sls-common"
+	"stash.us.cray.com/HMS/hms-smd/pkg/sm"
 	"strings"
 	"time"
 )
@@ -143,6 +145,122 @@ func buildStaticRRSets(networks []sls_common.Network) (staticRRSets []powerdns.R
 					staticRRSets = append(staticRRSets, aliasRRset)
 				}
 			}
+		}
+	}
+
+	return
+}
+
+type networkNameCIDRMap struct {
+	name string
+	cidr *net.IPNet
+}
+
+func buildDynamicRRsets(hardware []sls_common.GenericHardware, networks []sls_common.Network,
+	ethernetInterfaces []sm.CompEthInterface) (dynamicRRSets []powerdns.RRset, err error) {
+
+	// Start by precomputing network information.
+	var networkNameCIDRMaps []networkNameCIDRMap
+	for _, network := range networks {
+		networkDomain := strings.ToLower(network.Name)
+
+		for _, ipRange := range network.IPRanges {
+			_, cidr, err := net.ParseCIDR(ipRange)
+			if err != nil {
+				logger.Error("Failed to parse network CIDR!", zap.Error(err), zap.Any("network", network))
+			}
+
+			networkNameCIDRMaps = append(networkNameCIDRMaps, networkNameCIDRMap{
+				name: networkDomain,
+				cidr: cidr,
+			})
+		}
+	}
+
+	// Also build an SLS hardware map.
+	slsHardareMap := make(map[string]sls_common.GenericHardware)
+	for _, device := range hardware {
+		slsHardareMap[device.Xname] = device
+	}
+
+	for _, ethernetInterface := range ethernetInterfaces {
+		// Have to ignore entries without IPs or ComponentIDs.
+		if ethernetInterface.IPAddr == "" || ethernetInterface.CompID == "" {
+			continue
+		}
+
+
+		var belongedNetwork networkNameCIDRMap
+		ip, _, err := net.ParseCIDR(fmt.Sprintf("%s/32",ethernetInterface.IPAddr))
+		if err != nil {
+			logger.Error("Failed to parse ethernet interface IP!",
+				zap.Error(err), zap.Any("ethernetInterface", ethernetInterface))
+			continue
+		}
+
+		// First figure out what network this IP belongs to.
+		for _, network := range networkNameCIDRMaps {
+			if network.cidr.Contains(ip) {
+				belongedNetwork = network
+				break
+			}
+		}
+
+		if (belongedNetwork == networkNameCIDRMap{}) {
+			logger.Error("Failed to find a network this ethernet interface belongs to!",
+				zap.Any("ethernetInterface", ethernetInterface))
+			continue
+		}
+
+		// Now we know the network path.
+		networkDomain := strings.ToLower(belongedNetwork.name)
+
+		// Start by making the core A record.
+		primaryName := fmt.Sprintf("%s.%s.%s.", ethernetInterface.CompID, networkDomain, *baseDomain)
+		primaryRRset := powerdns.RRset{
+			Name:       powerdns.String(primaryName),
+			Type:       powerdns.RRTypePtr(powerdns.RRTypeA),
+			TTL:        powerdns.Uint32(3600),
+			ChangeType: powerdns.ChangeTypePtr(powerdns.ChangeTypeReplace),
+			Records: []powerdns.Record{
+				{
+					Content:  powerdns.String(ethernetInterface.IPAddr),
+					Disabled: powerdns.Bool(false),
+				},
+			},
+		}
+		dynamicRRSets = append(dynamicRRSets, primaryRRset)
+
+		// Now we can create CNAME records for all of the aliases.
+		// Start by getting the SLS hardware entry.
+		slsEntry, found := slsHardareMap[ethernetInterface.CompID]
+		if !found {
+			logger.Error("Failed to find SLS entry for ethernet interface!",
+				zap.Any("ethernetInterface", ethernetInterface))
+			continue
+		}
+
+		var extraProperties sls_common.ComptypeNode
+		err = mapstructure.Decode(slsEntry.ExtraPropertiesRaw, &extraProperties)
+		if err != nil {
+			logger.Error("Failed to decode node extra properties!", zap.Error(err))
+			continue
+		}
+
+		for _, alias := range extraProperties.Aliases {
+			aliasRRset := powerdns.RRset{
+				Name:       powerdns.String(fmt.Sprintf("%s.%s.%s.", alias, networkDomain, *baseDomain)),
+				Type:       powerdns.RRTypePtr(powerdns.RRTypeCNAME),
+				TTL:        powerdns.Uint32(3600),
+				ChangeType: powerdns.ChangeTypePtr(powerdns.ChangeTypeReplace),
+				Records: []powerdns.Record{
+					{
+						Content:  powerdns.String(primaryName),
+						Disabled: powerdns.Bool(false),
+					},
+				},
+			}
+			dynamicRRSets = append(dynamicRRSets, aliasRRset)
 		}
 	}
 
@@ -303,16 +421,32 @@ func trueUpDNS() {
 			logger.Error("Failed to get networks from SLS!", zap.Error(err))
 			continue
 		}
+		hardware, err := getSLSHardware()
+		if err != nil {
+			logger.Error("Failed to get hardware from SLS!", zap.Error(err))
+			continue
+		}
+		ethernetInterfaces, err := getHSMEthernetInterfaces()
+		if err != nil {
+			logger.Error("Failed to get ethernet interfaces from HSM!", zap.Error(err))
+			continue
+		}
 
 		staticRRSets, err := buildStaticRRSets(networks)
 		if err != nil {
 			logger.Error("Failed to build static RRsets!", zap.Error(err))
 		}
 
+		dynamicRRSets, err := buildDynamicRRsets(hardware, networks, ethernetInterfaces)
+		if err != nil {
+			logger.Error("Failed to build dynamic RRsets!", zap.Error(err))
+		}
+
 		// At this point we have computed every correct RRSet necessary. Now the only task is to add the ones that are
 		// missing and remove the ones that shouldn't be there.
 		var finalRRSet []powerdns.RRset
 		finalRRSet = append(finalRRSet, staticRRSets...)
+		finalRRSet = append(finalRRSet, dynamicRRSets...)
 
 		didSomething := trueUpRRSets(finalRRSet, masterZone)
 

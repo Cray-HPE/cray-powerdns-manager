@@ -45,6 +45,33 @@ type IPV4Subnet struct {
 	Comment        string          `json:"Comment,omitempty"`
 }
 
+func getSLSHardware() (hardware []sls_common.GenericHardware, err error) {
+	url := fmt.Sprintf("%s/v1/hardware", *slsURL)
+	req, err := retryablehttp.NewRequest("GET", url, nil)
+	if err != nil {
+		err = fmt.Errorf("failed to create new request: %w", err)
+		return
+	}
+	if token != "" {
+		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
+	}
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		err = fmt.Errorf("failed to do request: %w", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	body, _ := ioutil.ReadAll(resp.Body)
+	err = json.Unmarshal(body, &hardware)
+	if err != nil {
+		err = fmt.Errorf("failed to unmarshal body: %w", err)
+	}
+
+	return
+}
+
 func getSLSNetworks() (networks []sls_common.Network, err error) {
 	url := fmt.Sprintf("%s/v1/networks",
 		*slsURL)
@@ -62,6 +89,7 @@ func getSLSNetworks() (networks []sls_common.Network, err error) {
 		err = fmt.Errorf("failed to do request: %w", err)
 		return
 	}
+	defer resp.Body.Close()
 
 	body, _ := ioutil.ReadAll(resp.Body)
 	err = json.Unmarshal(body, &networks)

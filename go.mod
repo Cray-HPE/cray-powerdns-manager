@@ -22,4 +22,5 @@ require (
 	golang.org/x/text v0.3.6 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	stash.us.cray.com/HMS/hms-sls v1.8.1
+	stash.us.cray.com/HMS/hms-smd v1.28.7 // indirect
 )

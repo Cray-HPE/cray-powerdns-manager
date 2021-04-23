@@ -27,10 +27,9 @@ var (
 	slaveServers = flag.String("slave_servers", "ns2.shasta.dev.cray.com/192.168.53.5",
 		"Comma separated list of slave DNS FQDNs/IPs")
 
-	slsURL = flag.String("sls_url", "http://cray-sls",
-		"System Layout Service URL")
-	hsmURL = flag.String("hsm_url", "http://cray-smd",
-		"State Manager URL")
+	slsURL = flag.String("sls_url", "http://cray-sls", "System Layout Service URL")
+	hsmURL = flag.String("hsm_url", "http://cray-smd", "State Manager URL")
+	keaURL = flag.String("kea_url", "http://cray-dhcp-kea:8000", "Kea URL")
 
 	pdnsURL = flag.String("pdns_url", "http://localhost:9090",
 		"PowerDNS URL")

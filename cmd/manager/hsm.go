@@ -19,6 +19,7 @@ func getHSMEthernetInterfaces() (ethernetInterfaces []sm.CompEthInterface, err e
 	if token != "" {
 		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
 	}
+	req	= req.WithContext(ctx)
 
 	resp, err := httpClient.Do(req)
 	if err != nil {

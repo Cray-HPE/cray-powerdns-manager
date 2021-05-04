@@ -34,9 +34,10 @@ func makeDomainCanonical(domain string) string {
 	}
 }
 
-func trueUpMasterZone(baseDomain string, nameservers []nameserver) (masterZone *powerdns.Zone, err error) {
-	// First and foremost, check to make sure there is a master zone for the base domain.
-	masterZone, err = pdns.Zones.Get(baseDomain)
+func ensureMasterZone(zoneName string, nameserverFQDNs []string,
+	rrSets []powerdns.RRset) (masterZone *powerdns.Zone) {
+	var err error
+	masterZone, err = pdns.Zones.Get(zoneName)
 	if err != nil {
 		pdnsErr, ok := err.(*powerdns.Error)
 		if !ok {
@@ -44,31 +45,8 @@ func trueUpMasterZone(baseDomain string, nameservers []nameserver) (masterZone *
 			return
 		} else {
 			if pdnsErr.StatusCode == http.StatusNotFound {
-				var nameserverFQDNs []string
-				var rrSets []powerdns.RRset
-
-				// We have to create A recoreds for all the name servers otherwise it won't let us create the zone.
-				for _, nameserver := range nameservers {
-					canonicalName := makeDomainCanonical(nameserver.FQDN)
-					nameserverFQDNs = append(nameserverFQDNs, canonicalName)
-
-					nameserverRRSet := powerdns.RRset{
-						Name: &canonicalName,
-						Type: powerdns.RRTypePtr(powerdns.RRTypeA),
-						TTL:  powerdns.Uint32(3600),
-						Records: []powerdns.Record{
-							{
-								Content:  powerdns.String(nameserver.IP),
-								Disabled: powerdns.Bool(false),
-							},
-						},
-					}
-
-					rrSets = append(rrSets, nameserverRRSet)
-				}
-
 				zone := &powerdns.Zone{
-					Name:        &baseDomain,
+					Name:        &zoneName,
 					Kind:        powerdns.ZoneKindPtr(powerdns.MasterZoneKind),
 					DNSsec:      powerdns.Bool(true),
 					Nameservers: nameserverFQDNs,
@@ -81,7 +59,7 @@ func trueUpMasterZone(baseDomain string, nameservers []nameserver) (masterZone *
 						zap.Error(err), zap.Any("masterZone", *masterZone))
 					return
 				} else {
-					logger.Info("Added base domain", zap.String("baseDomain", baseDomain))
+					logger.Info("Added master zone", zap.String("zoneName", zoneName))
 				}
 
 				return
@@ -93,6 +71,52 @@ func trueUpMasterZone(baseDomain string, nameservers []nameserver) (masterZone *
 	}
 
 	logger.Debug("Master zone already exists.")
+
+	return
+}
+
+func trueUpMasterZones(baseDomain string, networks []sls_common.Network,
+	nameservers []nameserver) (masterZones []*powerdns.Zone) {
+	// Compute all of the information we need concerning nameservers.
+	var nameserverFQDNs []string
+	var nameserverRRSets []powerdns.RRset
+
+	// We have to create A records for all the name servers otherwise it won't let us create the zone.
+	for _, nameserver := range nameservers {
+		canonicalName := makeDomainCanonical(nameserver.FQDN)
+		nameserverFQDNs = append(nameserverFQDNs, canonicalName)
+
+		nameserverRRSet := powerdns.RRset{
+			Name: &canonicalName,
+			Type: powerdns.RRTypePtr(powerdns.RRTypeA),
+			TTL:  powerdns.Uint32(3600),
+			Records: []powerdns.Record{
+				{
+					Content:  powerdns.String(nameserver.IP),
+					Disabled: powerdns.Bool(false),
+				},
+			},
+		}
+
+		nameserverRRSets = append(nameserverRRSets, nameserverRRSet)
+	}
+
+	// First and foremost, check to make sure there is a master zone for the base domain. We won't add this to the
+	// return set of master zones because none of the records should belong to the base domain, they should all be
+	// fully qualified with their appropriate network.
+	_ = ensureMasterZone(baseDomain, nameserverFQDNs, nameserverRRSets)
+	//masterZones = append(masterZones, baseMasterZone)
+
+	// Now make sure there is a master zone for each of the networks retrieved from SLS.
+	for _, network := range networks {
+		networkDomain := strings.ToLower(network.Name)
+		fullDomain := fmt.Sprintf("%s.%s", networkDomain, baseDomain)
+
+		networkMasterZone := ensureMasterZone(fullDomain, nameserverFQDNs, nil)
+		if networkMasterZone != nil {
+			masterZones = append(masterZones, networkMasterZone)
+		}
+	}
 
 	return
 }
@@ -418,21 +442,36 @@ func rrsetsEqual(a powerdns.RRset, b powerdns.RRset) bool {
 	return true
 }
 
+func getZoneForRRSet(rrSet powerdns.RRset, zones []*powerdns.Zone) *string {
+	for _, zone := range zones {
+		if strings.HasSuffix(*rrSet.Name, *zone.Name) {
+			return zone.Name
+		}
+	}
+
+	return nil
+}
+
 // trueUpRRSets verifies all of the RRsets for the zone are as they should be.
 // There are a total of 3 possibilities for each RRset:
 //	1) The RRset doesn't exist at all.
 //	2) The RRset exists but the records are not correct.
 //  3) The RRset exists and shouldn't.
-func trueUpRRSets(rrsets []powerdns.RRset, zone *powerdns.Zone) bool {
-	// Main data structure to keep track of the RRsets we actually need to patch.
-	var actionableRRSets powerdns.RRsets
+func trueUpRRSets(rrsets []powerdns.RRset, zones []*powerdns.Zone) (didSomething bool) {
+	// Main data structure to keep track of the RRsets we actually need to patch with the zone it should be added to.
+	actionableRRSetMap := make(map[string]*powerdns.RRsets)
+	for _, zone := range zones {
+		actionableRRSetMap[*zone.Name] = &powerdns.RRsets{Sets: []powerdns.RRset{}}
+	}
 
 	// To make this process a lot quicker first build up a map of names to RRsets for O(1) lookups later.
 	zoneRRsetMap := make(map[string]powerdns.RRset)
 	desiredRRSetMap := make(map[string]powerdns.RRset)
 
-	for _, zoneRRset := range zone.RRsets {
-		zoneRRsetMap[*zoneRRset.Name] = zoneRRset
+	for _, zone := range zones {
+		for _, zoneRRset := range zone.RRsets {
+			zoneRRsetMap[*zoneRRset.Name] = zoneRRset
+		}
 	}
 	for _, desiredRRset := range rrsets {
 		desiredRRSetMap[*desiredRRset.Name] = desiredRRset
@@ -444,17 +483,27 @@ func trueUpRRSets(rrsets []powerdns.RRset, zone *powerdns.Zone) bool {
 		patchLogger := logger.With(zap.Any("desiredRRset", desiredRRset),
 			zap.Any("zoneRRset", zoneRRset))
 
+		// Need to identity which zone this record belongs to.
+		zoneName := getZoneForRRSet(desiredRRset, zones)
+		if zoneName == nil {
+			patchLogger.Error("Desired RRSet did not match any master zones!", zap.Any("zones", zones))
+			continue
+		}
+
+
+		zoneSets := &actionableRRSetMap[*zoneName].Sets
+
 		if found {
 			// Case 2 - is the RRSet correct?
 			if !rrsetsEqual(desiredRRset, zoneRRset) {
-				actionableRRSets.Sets = append(actionableRRSets.Sets, desiredRRset)
+				*zoneSets = append(*zoneSets, desiredRRset)
 				patchLogger.Info("RRset exists but is not ideal configuration, adding to patch list.")
 			} else {
 				logger.Debug("RRset already at desired config", zap.Any("zoneRRset", zoneRRset))
 			}
 		} else {
 			// Case 1 - not found, add it.
-			actionableRRSets.Sets = append(actionableRRSets.Sets, desiredRRset)
+			*zoneSets = append(*zoneSets, desiredRRset)
 			patchLogger.Info("RRset does not exist, adding to patch list.")
 		}
 	}
@@ -463,26 +512,40 @@ func trueUpRRSets(rrsets []powerdns.RRset, zone *powerdns.Zone) bool {
 	for _, zoneRRset := range zoneRRsetMap {
 		_, found := desiredRRSetMap[*zoneRRset.Name]
 
-		if !found &&
-			zoneRRset.Type == powerdns.RRTypePtr(powerdns.RRTypeNS) {
+		if !found && zoneRRset.Type == powerdns.RRTypePtr(powerdns.RRTypeNS) {
+			patchLogger := logger.With(zap.Any("zoneRRset", zoneRRset))
+
+			// Need to identity which zone this record belongs to.
+			zoneName := getZoneForRRSet(zoneRRset, zones)
+			if zoneName == nil {
+				patchLogger.Error("Desired RRSet did not match any master zones!", zap.Any("zones", zones))
+				continue
+			}
+
+			zoneSets := actionableRRSetMap[*zoneName].Sets
+
 			zoneRRset.ChangeType = powerdns.ChangeTypePtr(powerdns.ChangeTypeDelete)
-			actionableRRSets.Sets = append(actionableRRSets.Sets, zoneRRset)
-			logger.Info("RRset needs to be removed, adding to patch list.", zap.Any("zoneRRset", zoneRRset))
+			zoneSets = append(zoneSets, zoneRRset)
+			patchLogger.Info("RRset needs to be removed, adding to patch list.")
 		}
 	}
 
-	if len(actionableRRSets.Sets) > 0 {
-		// Do all the patching (which is additions, changes, and deletes) in one API call...pretty cool.
-		err := pdns.Records.Patch(*zone.Name, &actionableRRSets)
-		if err != nil {
-			logger.Error("Failed to patch RRsets!", zap.Error(err), zap.Any("zone", zone))
-		} else {
-			logger.Info("Patched RRSets")
-			return true
+	for zone, rrSets := range actionableRRSetMap {
+		zoneLogger := logger.With(zap.String("zone", zone))
+
+		if len(rrSets.Sets) > 0 {
+			// Do all the patching (which is additions, changes, and deletes) in one API call...pretty cool.
+			err := pdns.Records.Patch(zone, rrSets)
+			if err != nil {
+				zoneLogger.Error("Failed to patch RRsets!", zap.Error(err), zap.Any("zone", zone))
+			} else {
+				zoneLogger.Info("Patched RRSets")
+				didSomething = true
+			}
 		}
 	}
 
-	return false
+	return
 }
 
 func buildNameserverRRset(nameserver nameserver) powerdns.RRset {
@@ -567,11 +630,10 @@ func trueUpDNS() {
 			continue
 		}
 
-		masterZone, err := trueUpMasterZone(*baseDomain, nameServers)
-		if err != nil {
-			logger.Error("Failed to true up master zone!", zap.Error(err))
-			continue
-		}
+		// Build/get all necessary master zones.
+		masterZones := trueUpMasterZones(*baseDomain, networks, nameServers)
+
+		// True up reverse zones.
 		reverseZones, err := trueUpReverseZones(networks, nameServers)
 		if err != nil {
 			logger.Error("Failed to true up reverse zones!", zap.Error(err))
@@ -588,7 +650,7 @@ func trueUpDNS() {
 					zap.Error(err), zap.Any("reverseZone", reverseZone))
 			}
 
-			if trueUpRRSets(staticRRSetsReverse, reverseZone) {
+			if trueUpRRSets(staticRRSetsReverse, []*powerdns.Zone{reverseZone}) {
 				result, err := pdns.Zones.Notify(*reverseZone.Name)
 				if err != nil {
 					logger.Error("Failed to notify slave server(s)!", zap.Error(err))
@@ -610,7 +672,7 @@ func trueUpDNS() {
 		finalRRSet = append(finalRRSet, dynamicRRSets...)
 
 		// Force a sync to any slave servers if we did something.
-		if trueUpRRSets(finalRRSet, masterZone) {
+		if trueUpRRSets(finalRRSet, masterZones) {
 			result, err := pdns.Zones.Notify(*baseDomain)
 			if err != nil {
 				logger.Error("Failed to notify slave server(s)!", zap.Error(err))

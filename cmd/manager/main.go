@@ -12,7 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"stash.us.cray.com/CASMNET/cray-powerdns-manager/internal/httpLogger"
+	"stash.us.cray.com/CSM/cray-powerdns-manager/internal/httpLogger"
 	"strings"
 	"sync"
 	"syscall"
@@ -150,7 +150,7 @@ func main() {
 	}
 	httpClient.HTTPClient.Transport = transport
 
-	httpClient.RetryMax = 2
+	httpClient.RetryMax = 3
 	httpClient.RetryWaitMax = time.Second * 2
 
 	// Also, since we're using Zap logger it make sense to set the logger to use the one we've already setup.

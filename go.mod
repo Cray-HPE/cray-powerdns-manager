@@ -1,9 +1,8 @@
-module stash.us.cray.com/CASMNET/cray-powerdns-manager
+module stash.us.cray.com/CSM/cray-powerdns-manager
 
 go 1.16
 
 require (
-	github.com/davecgh/go-spew v1.1.1
 	github.com/gin-gonic/gin v1.7.1
 	github.com/go-playground/validator/v10 v10.5.0 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
@@ -22,5 +21,5 @@ require (
 	golang.org/x/text v0.3.6 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	stash.us.cray.com/HMS/hms-sls v1.8.1
-	stash.us.cray.com/HMS/hms-smd v1.28.7 // indirect
+	stash.us.cray.com/HMS/hms-smd v1.28.7
 )

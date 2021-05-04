@@ -55,6 +55,7 @@ func getSLSHardware() (hardware []sls_common.GenericHardware, err error) {
 	if token != "" {
 		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
 	}
+	req	= req.WithContext(ctx)
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
@@ -83,6 +84,7 @@ func getSLSNetworks() (networks []sls_common.Network, err error) {
 	if token != "" {
 		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
 	}
+	req	= req.WithContext(ctx)
 
 	resp, err := httpClient.Do(req)
 	if err != nil {

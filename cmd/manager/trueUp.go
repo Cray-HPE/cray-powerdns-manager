@@ -7,35 +7,14 @@ import (
 	"go.uber.org/zap"
 	"net"
 	"net/http"
-	"reflect"
+	"stash.us.cray.com/CSM/cray-powerdns-manager/internal/common"
 	sls_common "stash.us.cray.com/HMS/hms-sls/pkg/sls-common"
 	"stash.us.cray.com/HMS/hms-smd/pkg/sm"
 	"strings"
 	"time"
 )
 
-const rdnsDomain = ".in-addr.arpa"
-
-type nameserver struct {
-	FQDN string
-	IP   string
-}
-
-type networkNameCIDRMap struct {
-	name string
-	cidr *net.IPNet
-}
-
-func makeDomainCanonical(domain string) string {
-	if strings.HasSuffix(domain, ".") {
-		return domain
-	} else {
-		return fmt.Sprintf("%s.", domain)
-	}
-}
-
-func ensureMasterZone(zoneName string, nameserverFQDNs []string,
-	rrSets []powerdns.RRset) (masterZone *powerdns.Zone) {
+func ensureMasterZone(zoneName string, nameserverFQDNs []string, rrSets []powerdns.RRset) (masterZone *powerdns.Zone) {
 	var err error
 	masterZone, err = pdns.Zones.Get(zoneName)
 	if err != nil {
@@ -76,14 +55,14 @@ func ensureMasterZone(zoneName string, nameserverFQDNs []string,
 }
 
 func trueUpMasterZones(baseDomain string, networks []sls_common.Network,
-	nameservers []nameserver) (masterZones []*powerdns.Zone) {
+	nameservers []common.Nameserver) (masterZones []*powerdns.Zone) {
 	// Compute all of the information we need concerning nameservers.
 	var nameserverFQDNs []string
 	var nameserverRRSets []powerdns.RRset
 
 	// We have to create A records for all the name servers otherwise it won't let us create the zone.
 	for _, nameserver := range nameservers {
-		canonicalName := makeDomainCanonical(nameserver.FQDN)
+		canonicalName := common.MakeDomainCanonical(nameserver.FQDN)
 		nameserverFQDNs = append(nameserverFQDNs, canonicalName)
 
 		nameserverRRSet := powerdns.RRset{
@@ -121,25 +100,11 @@ func trueUpMasterZones(baseDomain string, networks []sls_common.Network,
 	return
 }
 
-func buildReverseName(cidrParts []string) string {
-	var reverseCIDR []string
-
-	for i := len(cidrParts) - 1; i >= 0; i-- {
-		part := cidrParts[i]
-
-		if part != "0" {
-			reverseCIDR = append(reverseCIDR, cidrParts[i])
-		}
-	}
-
-	return fmt.Sprintf("%s%s", strings.Join(reverseCIDR, "."), rdnsDomain)
-}
-
-func trueUpReverseZones(networks []sls_common.Network, nameservers []nameserver) (reverseZones []*powerdns.Zone,
+func trueUpReverseZones(networks []sls_common.Network, nameservers []common.Nameserver) (reverseZones []*powerdns.Zone,
 	err error) {
 	var nameserverFQDNs []string
 	for _, nameserver := range nameservers {
-		canonicalName := makeDomainCanonical(nameserver.FQDN)
+		canonicalName := common.MakeDomainCanonical(nameserver.FQDN)
 		nameserverFQDNs = append(nameserverFQDNs, canonicalName)
 	}
 	for _, network := range networks {
@@ -152,7 +117,7 @@ func trueUpReverseZones(networks []sls_common.Network, nameservers []nameserver)
 			}
 
 			cidrParts := strings.Split(cidr.IP.String(), ".")
-			reverseZoneName := buildReverseName(cidrParts)
+			reverseZoneName := common.GetReverseName(cidrParts)
 
 			var reverseZone *powerdns.Zone
 			reverseZone, err = pdns.Zones.Get(reverseZoneName)
@@ -164,9 +129,9 @@ func trueUpReverseZones(networks []sls_common.Network, nameservers []nameserver)
 				} else {
 					if pdnsErr.StatusCode == http.StatusNotFound {
 						reverseZone = &powerdns.Zone{
-							Name:   &reverseZoneName,
-							Kind:   powerdns.ZoneKindPtr(powerdns.MasterZoneKind),
-							DNSsec: powerdns.Bool(true),
+							Name:        &reverseZoneName,
+							Kind:        powerdns.ZoneKindPtr(powerdns.MasterZoneKind),
+							DNSsec:      powerdns.Bool(true),
 							Nameservers: nameserverFQDNs,
 						}
 						reverseZone, err = pdns.Zones.Add(reverseZone)
@@ -250,53 +215,17 @@ func buildStaticForwardRRSets(networks []sls_common.Network) (staticRRSets []pow
 	return
 }
 
-func getForwardCIDRStringForReverseZone(reverseZone *powerdns.Zone) (forwardCIDRString string, err error) {
-	if !strings.Contains(*reverseZone.Name, rdnsDomain) {
-		err = fmt.Errorf("zone does not appear to be a reverse zone: %s", *reverseZone.Name)
-		return
-	}
-
-	// Compute the forward CIDR for this zone.
-	trimmedCIDR := strings.TrimSuffix(*reverseZone.Name, rdnsDomain + ".")
-	reverseCIDRParts := strings.Split(trimmedCIDR, ".")
-	var forwardCIDR []string
-
-	for i := len(reverseCIDRParts) - 1; i >= 0; i-- {
-		forwardCIDR = append(forwardCIDR, reverseCIDRParts[i])
-	}
-	for i := len(forwardCIDR); i < 4; i++ {
-		forwardCIDR = append(forwardCIDR, "0")
-	}
-
-	forwardCIDRString = strings.Join(forwardCIDR, ".")
-
-	return
-}
-
-// GetNetworkForCIDRString computes the network and IP range for a CIDR string.
-func GetNetworkForCIDRString(networks []sls_common.Network, cidr string) (*sls_common.Network, *string) {
-	for _, network := range networks {
-		for _, ipRange := range network.IPRanges {
-			if strings.HasPrefix(ipRange, cidr) {
-				return &network, &ipRange
-			}
-		}
-	}
-
-	return nil, nil
-}
-
 func buildDynamicReverseRRSets(hardware []sls_common.GenericHardware, networks []sls_common.Network,
 	ethernetInterfaces []sm.CompEthInterface, reverseZone *powerdns.Zone) (dynamicRRSets []powerdns.RRset,
 	err error) {
 	var forwardCIDRString string
-	forwardCIDRString, err = getForwardCIDRStringForReverseZone(reverseZone)
+	forwardCIDRString, err = common.GetForwardCIDRStringForReverseZone(reverseZone)
 	if err != nil {
 		return
 	}
 
 	// Find the SLS network associated with this reverse zone so we know what the full CIDR is.
-	network, ipRange := GetNetworkForCIDRString(networks, forwardCIDRString)
+	network, ipRange := common.GetNetworkForCIDRString(networks, forwardCIDRString)
 	if network == nil || ipRange == nil {
 		err = fmt.Errorf("reverse zone does not have associated SLS network or IP range in network")
 		return
@@ -329,7 +258,7 @@ func buildDynamicReverseRRSets(hardware []sls_common.GenericHardware, networks [
 			cidrParts := strings.Split(ip.String(), ".")
 
 			rrsetReverse := powerdns.RRset{
-				Name:       powerdns.String(makeDomainCanonical(buildReverseName(cidrParts))),
+				Name:       powerdns.String(common.MakeDomainCanonical(common.GetReverseName(cidrParts))),
 				Type:       powerdns.RRTypePtr(powerdns.RRTypePTR),
 				TTL:        powerdns.Uint32(3600),
 				ChangeType: powerdns.ChangeTypePtr(powerdns.ChangeTypeReplace),
@@ -350,7 +279,7 @@ func buildDynamicReverseRRSets(hardware []sls_common.GenericHardware, networks [
 func buildStaticReverseRRSets(networks []sls_common.Network,
 	reverseZone *powerdns.Zone) (staticReverseRRSets []powerdns.RRset, err error) {
 	var forwardCIDRString string
-	forwardCIDRString, err = getForwardCIDRStringForReverseZone(reverseZone)
+	forwardCIDRString, err = common.GetForwardCIDRStringForReverseZone(reverseZone)
 	if err != nil {
 		return
 	}
@@ -383,7 +312,7 @@ func buildStaticReverseRRSets(networks []sls_common.Network,
 						cidrParts := strings.Split(reservation.IPAddress, ".")
 
 						rrsetReverse := powerdns.RRset{
-							Name:       powerdns.String(makeDomainCanonical(buildReverseName(cidrParts))),
+							Name:       powerdns.String(common.MakeDomainCanonical(common.GetReverseName(cidrParts))),
 							Type:       powerdns.RRTypePtr(powerdns.RRTypePTR),
 							TTL:        powerdns.Uint32(3600),
 							ChangeType: powerdns.ChangeTypePtr(powerdns.ChangeTypeReplace),
@@ -409,7 +338,7 @@ func buildDynamicForwardRRsets(hardware []sls_common.GenericHardware, networks [
 	err error) {
 
 	// Start by precomputing network information.
-	var networkNameCIDRMaps []networkNameCIDRMap
+	var networkNameCIDRMaps []common.NetworkNameCIDRMap
 	for _, network := range networks {
 		networkDomain := strings.ToLower(network.Name)
 
@@ -419,9 +348,9 @@ func buildDynamicForwardRRsets(hardware []sls_common.GenericHardware, networks [
 				logger.Error("Failed to parse network CIDR!", zap.Error(err), zap.Any("network", network))
 			}
 
-			networkNameCIDRMaps = append(networkNameCIDRMaps, networkNameCIDRMap{
-				name: networkDomain,
-				cidr: cidr,
+			networkNameCIDRMaps = append(networkNameCIDRMaps, common.NetworkNameCIDRMap{
+				Name: networkDomain,
+				CIDR: cidr,
 			})
 		}
 	}
@@ -438,7 +367,7 @@ func buildDynamicForwardRRsets(hardware []sls_common.GenericHardware, networks [
 			continue
 		}
 
-		var belongedNetwork networkNameCIDRMap
+		var belongedNetwork common.NetworkNameCIDRMap
 		ip, _, err := net.ParseCIDR(fmt.Sprintf("%s/32", ethernetInterface.IPAddr))
 		if err != nil {
 			logger.Error("Failed to parse ethernet interface IP!",
@@ -448,20 +377,20 @@ func buildDynamicForwardRRsets(hardware []sls_common.GenericHardware, networks [
 
 		// First figure out what network this IP belongs to.
 		for _, network := range networkNameCIDRMaps {
-			if network.cidr.Contains(ip) {
+			if network.CIDR.Contains(ip) {
 				belongedNetwork = network
 				break
 			}
 		}
 
-		if (belongedNetwork == networkNameCIDRMap{}) {
+		if (belongedNetwork == common.NetworkNameCIDRMap{}) {
 			logger.Error("Failed to find a network this ethernet interface belongs to!",
 				zap.Any("ethernetInterface", ethernetInterface))
 			continue
 		}
 
 		// Now we know the network path.
-		networkDomain := strings.ToLower(belongedNetwork.name)
+		networkDomain := strings.ToLower(belongedNetwork.Name)
 
 		// Start by making the core A record.
 		primaryName := fmt.Sprintf("%s.%s.%s.", ethernetInterface.CompID, networkDomain, *baseDomain)
@@ -515,27 +444,6 @@ func buildDynamicForwardRRsets(hardware []sls_common.GenericHardware, networks [
 	return
 }
 
-func rrsetsEqual(a powerdns.RRset, b powerdns.RRset) bool {
-	if *a.Name != *b.Name ||
-		!reflect.DeepEqual(a.Records, b.Records) ||
-		*a.TTL != *b.TTL ||
-		*a.Type != *b.Type {
-		return false
-	}
-
-	return true
-}
-
-func getZoneForRRSet(rrSet powerdns.RRset, zones []*powerdns.Zone) *string {
-	for _, zone := range zones {
-		if strings.HasSuffix(*rrSet.Name, *zone.Name) {
-			return zone.Name
-		}
-	}
-
-	return nil
-}
-
 // trueUpRRSets verifies all of the RRsets for the zone are as they should be.
 // There are a total of 3 possibilities for each RRset:
 //	1) The RRset doesn't exist at all.
@@ -571,19 +479,18 @@ func trueUpRRSets(rrsets []powerdns.RRset, zones []*powerdns.Zone) (didSomething
 			zap.Any("zoneRRset", zoneRRset))
 
 		// Need to identity which zone this record belongs to.
-		zoneName := getZoneForRRSet(desiredRRset, zones)
+		zoneName := common.GetZoneForRRSet(desiredRRset, zones)
 		if zoneName == nil {
 			patchLogger.Error("Desired RRSet did not match any master zones!",
 				zap.Any("zoneNames", zoneNames))
 			continue
 		}
 
-
 		zoneSets := &actionableRRSetMap[*zoneName].Sets
 
 		if found {
 			// Case 2 - is the RRSet correct?
-			if !rrsetsEqual(desiredRRset, zoneRRset) {
+			if !common.RRsetsEqual(desiredRRset, zoneRRset) {
 				*zoneSets = append(*zoneSets, desiredRRset)
 				patchLogger.Info("RRset exists but is not ideal configuration, adding to patch list.")
 			} else {
@@ -604,7 +511,7 @@ func trueUpRRSets(rrsets []powerdns.RRset, zones []*powerdns.Zone) (didSomething
 			patchLogger := logger.With(zap.Any("zoneRRset", zoneRRset))
 
 			// Need to identity which zone this record belongs to.
-			zoneName := getZoneForRRSet(zoneRRset, zones)
+			zoneName := common.GetZoneForRRSet(zoneRRset, zones)
 			if zoneName == nil {
 				patchLogger.Error("Desired RRSet did not match any master zones!", zap.Any("zones", zones))
 				continue
@@ -636,21 +543,6 @@ func trueUpRRSets(rrsets []powerdns.RRset, zones []*powerdns.Zone) (didSomething
 	return
 }
 
-func buildNameserverRRset(nameserver nameserver) powerdns.RRset {
-	return powerdns.RRset{
-		Name:       powerdns.String(makeDomainCanonical(nameserver.FQDN)),
-		Type:       powerdns.RRTypePtr(powerdns.RRTypeA),
-		TTL:        powerdns.Uint32(3600),
-		ChangeType: powerdns.ChangeTypePtr(powerdns.ChangeTypeReplace),
-		Records: []powerdns.Record{
-			{
-				Content:  powerdns.String(makeDomainCanonical(nameserver.FQDN)),
-				Disabled: powerdns.Bool(false),
-			},
-		},
-	}
-}
-
 func trueUpDNS() {
 	logger.Info("Running true up loop at interval.", zap.Int("trueUpLoopInterval", *trueUpSleepInterval))
 
@@ -678,26 +570,26 @@ func trueUpDNS() {
 			logger.Fatal("Master nameserver does not have FQDN/IP format!",
 				zap.String("masterServer", *masterServer))
 		}
-		masterNameserver := nameserver{
+		masterNameserver := common.Nameserver{
 			FQDN: masterNameserverSplit[0],
 			IP:   masterNameserverSplit[1],
 		}
-		nameserverRRsets = append(nameserverRRsets, buildNameserverRRset(masterNameserver))
+		nameserverRRsets = append(nameserverRRsets, common.GetNameserverRRset(masterNameserver))
 
-		nameServers := []nameserver{masterNameserver}
+		nameServers := []common.Nameserver{masterNameserver}
 		for _, slaveServer := range strings.Split(*slaveServers, ",") {
 			nameserverSplit := strings.Split(slaveServer, "/")
 			if len(nameserverSplit) != 2 {
 				logger.Fatal("Slave nameserver does not have FQDN/IP format!",
 					zap.String("slaveServer", slaveServer))
 			}
-			slaveNameserver := nameserver{
+			slaveNameserver := common.Nameserver{
 				FQDN: nameserverSplit[0],
 				IP:   nameserverSplit[1],
 			}
 
 			nameServers = append(nameServers, slaveNameserver)
-			nameserverRRsets = append(nameserverRRsets, buildNameserverRRset(slaveNameserver))
+			nameserverRRsets = append(nameserverRRsets, common.GetNameserverRRset(slaveNameserver))
 		}
 
 		var allMasterZones []*powerdns.Zone

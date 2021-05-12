@@ -69,12 +69,20 @@ func main() {
 		zoneBranch := tree.AddBranch(*zone.Name)
 
 		for _, rrSet := range zone.RRsets {
-			if *rrSet.Type == powerdns.RRTypeA || *rrSet.Type == powerdns.RRTypePTR {
-				nodeBranch := zoneBranch.AddBranch(*rrSet.Name)
+			if *rrSet.Type != powerdns.RRTypeCNAME && *rrSet.Type != powerdns.RRTypeSOA {
+				nodeBranch := zoneBranch.AddMetaBranch(*rrSet.Type, *rrSet.Name)
 
-				cnames := getCNAMEsForRRset(*rrSet.Name, zone.RRsets)
-				for _, cname := range cnames {
-					nodeBranch.AddNode(cname)
+				if *rrSet.Type == powerdns.RRTypeA || *rrSet.Type == powerdns.RRTypePTR {
+					cnames := getCNAMEsForRRset(*rrSet.Name, zone.RRsets)
+					for _, cname := range cnames {
+						nodeBranch.AddMetaNode(powerdns.RRTypeCNAME, cname)
+					}
+				}
+
+				if *rrSet.Type == powerdns.RRTypeNS {
+					for _, record := range rrSet.Records {
+						nodeBranch.AddNode(*record.Content)
+					}
 				}
 			}
 		}

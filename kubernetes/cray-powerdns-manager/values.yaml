@@ -20,7 +20,7 @@ cray-service:
     cray-powerdns-manager:
       name: "cray-powerdns-manager"
       image:
-        repository: "cray/cray-powerdns-manager"
+        repository: "cray/powerdns-manager"
       ports:
         - name: http
           containerPort: 8080

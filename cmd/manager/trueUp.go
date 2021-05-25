@@ -97,6 +97,9 @@ func trueUpMasterZones(baseDomain string, networks []sls_common.Network,
 		}
 	}
 
+	// Now remove any zones that don't correspond to networks from SLS.
+
+
 	return
 }
 
@@ -153,7 +156,14 @@ func trueUpReverseZones(networks []sls_common.Network, nameservers []common.Name
 	return
 }
 
-func buildStaticForwardRRSets(networks []sls_common.Network) (staticRRSets []powerdns.RRset, err error) {
+func buildStaticForwardRRSets(networks []sls_common.Network, hardware []sls_common.GenericHardware) (
+	staticRRSets []powerdns.RRset, err error) {
+	// Build up a map of the hardware to save lookup time later.
+	hardwareMap := make(map[string]sls_common.GenericHardware)
+	for _, device := range hardware {
+		hardwareMap[device.Xname] = device
+	}
+
 	for _, network := range networks {
 		networkDomain := strings.ToLower(network.Name)
 
@@ -165,12 +175,36 @@ func buildStaticForwardRRSets(networks []sls_common.Network) (staticRRSets []pow
 
 		for _, subnet := range networkProperties.Subnets {
 			for _, reservation := range subnet.IPReservations {
-				// Avoid bad names.
-				if strings.Contains(reservation.Name, ".") {
-					continue
-				}
+				// Can't believe this is a thing, but, for some reason the xname for some entries is in the comment
+				// field. If that's the case, then we create the A record from that and then a CNAME for the name
+				// and then CNAMEs for each of the aliases.
+				// Start by seeing if this comment corresponds to a hardware object (i.e., is an xname).
+				node, found := hardwareMap[reservation.Comment]
 
-				primaryName := fmt.Sprintf("%s.%s.%s.", reservation.Name, networkDomain, *baseDomain)
+				// Now we can build the primary name for the A record.
+				var primaryName string
+				if found {
+					primaryName = fmt.Sprintf("%s.%s.%s.", node.Xname, networkDomain, *baseDomain)
+
+					// In this case we also have to create an additional RRset for the name which is the primary alias
+					// for the node...yea, still kooky.
+					nameRRset := powerdns.RRset{
+						Name:       powerdns.String(fmt.Sprintf("%s.%s.%s.",
+							reservation.Name, networkDomain, *baseDomain)),
+						Type:       powerdns.RRTypePtr(powerdns.RRTypeCNAME),
+						TTL:        powerdns.Uint32(3600),
+						ChangeType: powerdns.ChangeTypePtr(powerdns.ChangeTypeReplace),
+						Records: []powerdns.Record{
+							{
+								Content:  powerdns.String(primaryName),
+								Disabled: powerdns.Bool(false),
+							},
+						},
+					}
+					staticRRSets = append(staticRRSets, nameRRset)
+				} else {
+					primaryName = fmt.Sprintf("%s.%s.%s.", reservation.Name, networkDomain, *baseDomain)
+				}
 
 				// Create the primary forward A record.
 				primaryRRset := powerdns.RRset{
@@ -215,8 +249,8 @@ func buildStaticForwardRRSets(networks []sls_common.Network) (staticRRSets []pow
 	return
 }
 
-func buildDynamicReverseRRSets(hardware []sls_common.GenericHardware, networks []sls_common.Network,
-	ethernetInterfaces []sm.CompEthInterface, reverseZone *powerdns.Zone) (dynamicRRSets []powerdns.RRset,
+func buildDynamicReverseRRSets(networks []sls_common.Network, ethernetInterfaces []sm.CompEthInterface,
+	reverseZone *powerdns.Zone) (dynamicRRSets []powerdns.RRset,
 	err error) {
 	var forwardCIDRString string
 	forwardCIDRString, err = common.GetForwardCIDRStringForReverseZone(reverseZone)
@@ -624,7 +658,7 @@ func trueUpDNS() {
 		allMasterZones = append(allMasterZones, masterZones...)
 		allMasterZones = append(allMasterZones, reverseZones...)
 
-		staticRRSets, err := buildStaticForwardRRSets(networks)
+		staticRRSets, err := buildStaticForwardRRSets(networks, hardware)
 		if err != nil {
 			logger.Error("Failed to build static RRsets!", zap.Error(err))
 		}
@@ -644,7 +678,7 @@ func trueUpDNS() {
 			logger.Error("Failed to build dynamic RRsets!", zap.Error(err))
 		}
 		for _, reverseZone := range reverseZones {
-			dynamicRRSetsReverse, err := buildDynamicReverseRRSets(hardware, networks, ethernetInterfaces, reverseZone)
+			dynamicRRSetsReverse, err := buildDynamicReverseRRSets(networks, ethernetInterfaces, reverseZone)
 			if err != nil {
 				logger.Error("Failed to build reverse zone RRsets!",
 					zap.Error(err), zap.Any("reverseZone", reverseZone))

@@ -8,8 +8,12 @@ import (
 	"github.com/namsral/flag"
 	"github.com/xlab/treeprint"
 	"net/http"
+	"sort"
+	"strings"
 	"time"
 )
+
+const rdnsDomain = ".in-addr.arpa"
 
 var (
 	pdnsURL = flag.String("pdns_url", "http://localhost:9090", "PowerDNS URL")
@@ -52,6 +56,8 @@ func main() {
 	pdns = powerdns.NewClient(*pdnsURL, "localhost", map[string]string{"X-API-Key": *pdnsAPIKey},
 		httpClient.HTTPClient)
 
+	authoratativeRecords := make(map[string][]string)
+
 	// Get all the Zones.
 	zones, err := pdns.Zones.List()
 	if err != nil {
@@ -66,10 +72,12 @@ func main() {
 			panic(err)
 		}
 
+		var thisZoneRecords []string
 		zoneBranch := tree.AddBranch(*zone.Name)
 
 		for _, rrSet := range zone.RRsets {
 			if *rrSet.Type != powerdns.RRTypeCNAME && *rrSet.Type != powerdns.RRTypeSOA {
+				thisZoneRecords = append(thisZoneRecords, *rrSet.Name)
 				nodeBranch := zoneBranch.AddMetaBranch(*rrSet.Type, *rrSet.Name)
 
 				if *rrSet.Type == powerdns.RRTypeA || *rrSet.Type == powerdns.RRTypePTR {
@@ -79,14 +87,28 @@ func main() {
 					}
 				}
 
-				if *rrSet.Type == powerdns.RRTypeNS {
+				if *rrSet.Type == powerdns.RRTypeNS || *rrSet.Type == powerdns.RRTypePTR {
 					for _, record := range rrSet.Records {
 						nodeBranch.AddNode(*record.Content)
 					}
 				}
 			}
 		}
+
+		if !strings.Contains(*zone.Name, rdnsDomain) {
+			authoratativeRecords[*zone.Name] = thisZoneRecords
+		}
 	}
 
 	fmt.Println(tree.String())
+
+	for zone, records := range authoratativeRecords {
+		fmt.Printf("%s\n", zone)
+
+		sort.Strings(records)
+
+		for _, record := range records {
+			fmt.Printf("\t%s\n", record)
+		}
+	}
 }

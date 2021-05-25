@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/hashicorp/go-retryablehttp"
+	"github.com/mitchellh/mapstructure"
 	"io/ioutil"
 	sls_common "stash.us.cray.com/HMS/hms-sls/pkg/sls-common"
+	"strings"
 )
 
 // It's a shame to have to do this, but, because SLS native structures use the IP type which internally is an array of
@@ -93,10 +95,54 @@ func getSLSNetworks() (networks []sls_common.Network, err error) {
 	}
 	defer resp.Body.Close()
 
+	var originalNetworks []sls_common.Network
 	body, _ := ioutil.ReadAll(resp.Body)
-	err = json.Unmarshal(body, &networks)
+	err = json.Unmarshal(body, &originalNetworks)
 	if err != nil {
 		err = fmt.Errorf("failed to unmarshal body: %w", err)
+	}
+
+	// This is a hack to combine networks that really have no business being separate.
+	// For example, hmn, hmn_rvr, and hmn_mtn are all the same network. So what we're going to do is check every
+	// network to see if it's really a subset of a real top level network. If so, then combine it and remove it.
+	ignoredNetworks := make(map[string]sls_common.Network)
+	for networkIndex, _ := range originalNetworks {
+		network := &originalNetworks[networkIndex]
+		subsetString := fmt.Sprintf("%s_", network.Name)
+
+		var parentNetworkProperties NetworkExtraProperties
+		err = mapstructure.Decode(network.ExtraPropertiesRaw, &parentNetworkProperties)
+		if err != nil {
+			return
+		}
+
+		for _, subsetNetwork := range originalNetworks {
+			if strings.HasPrefix(subsetNetwork.Name, subsetString) {
+				// If this network is a subset of any other network it should be ignored.
+				ignoredNetworks[subsetNetwork.Name] = subsetNetwork
+
+				// Now combine the two.
+				network.IPRanges = append(network.IPRanges, subsetNetwork.IPRanges...)
+
+				var subsetNetworkProperties NetworkExtraProperties
+				err = mapstructure.Decode(subsetNetwork.ExtraPropertiesRaw, &subsetNetworkProperties)
+				if err != nil {
+					return
+				}
+
+				parentNetworkProperties.Subnets = append(parentNetworkProperties.Subnets,
+					subsetNetworkProperties.Subnets...)
+			}
+		}
+
+		network.ExtraPropertiesRaw = parentNetworkProperties
+	}
+
+	// Now we can return all the networks we're not explicitly ignoring.
+	for _, network := range originalNetworks {
+		if _, ok := ignoredNetworks[network.Name]; !ok {
+			networks = append(networks, network)
+		}
 	}
 
 	return

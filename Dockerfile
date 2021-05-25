@@ -49,7 +49,7 @@ FROM base AS builder
 #ARG go_build_args="-mod=vendor"
 
 RUN set -ex \
-    && go build ${go_build_args} -v -o /usr/local/bin/cray-powerdns-manager ./scmd/manager
+    && go build ${go_build_args} -v -o /usr/local/bin/cray-powerdns-manager ./cmd/manager
 
 ## Final Stage ###
 FROM arti.dev.cray.com/baseos-docker-master-local/alpine:3.12

@@ -1,5 +1,9 @@
-apiVersion: v1
+apiVersion: v2
 description: "Kubernetes Deployment for PowerDNS Manager"
 name: "cray-powerdns-manager"
+dependencies:
+  - name: cray-service
+    version: "~2.4.5"
+    repository: "@cray-internal"
 home: "CASMNET/powerdns-manager"
 version: 0.1.0

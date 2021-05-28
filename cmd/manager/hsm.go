@@ -10,7 +10,7 @@ import (
 )
 
 func getHSMEthernetInterfaces() (ethernetInterfaces []sm.CompEthInterface, err error) {
-	url := fmt.Sprintf("%s/v1/Inventory/EthernetInterfaces", *hsmURL)
+	url := fmt.Sprintf("%s/hsm/v1/Inventory/EthernetInterfaces", *hsmURL)
 	req, err := retryablehttp.NewRequest("GET", url, nil)
 	if err != nil {
 		err = fmt.Errorf("failed to create new request: %w", err)

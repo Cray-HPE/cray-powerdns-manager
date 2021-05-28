@@ -21,9 +21,15 @@ cray-service:
       name: "cray-powerdns-manager"
       image:
         repository: "cray/powerdns-manager"
+        pullPolicy: Always
       ports:
         - name: http
           containerPort: 8080
+      env:
+        - name: SLAVE_SERVERS
+          value: ""
+        - name: PDNS_URL
+          value: "http://cray-dns-powerdns-api:8081"
       livenessProbe:
         httpGet:
           port: 8080

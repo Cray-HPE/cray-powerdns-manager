@@ -33,6 +33,10 @@ func GetReverseName(cidrParts []string) string {
 
 // GetForwardCIDRStringForReverseZone generates a forward IP address from a reverse zone.
 func GetForwardCIDRStringForReverseZone(reverseZone *powerdns.Zone) (forwardCIDRString string, err error) {
+	if reverseZone == nil || reverseZone.Name == nil {
+		err = fmt.Errorf("reverse zone or name is nil")
+		return
+	}
 	if !strings.Contains(*reverseZone.Name, rdnsDomain) {
 		err = fmt.Errorf("zone does not appear to be a reverse zone: %s", *reverseZone.Name)
 		return

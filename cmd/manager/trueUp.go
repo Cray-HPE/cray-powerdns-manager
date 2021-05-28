@@ -18,6 +18,8 @@ func ensureMasterZone(zoneName string, nameserverFQDNs []string, rrSets []powerd
 	var err error
 	masterZone, err = pdns.Zones.Get(zoneName)
 	if err != nil {
+		masterZone = nil
+
 		pdnsErr, ok := err.(*powerdns.Error)
 		if !ok {
 			logger.Error("Error not a PowerDNS error type!", zap.Error(err))
@@ -124,7 +126,9 @@ func trueUpReverseZones(networks []sls_common.Network, nameservers []common.Name
 
 			var reverseZone *powerdns.Zone
 			reverseZone, err = pdns.Zones.Get(reverseZoneName)
-			if err != nil {
+			if err == nil {
+				reverseZones = append(reverseZones, reverseZone)
+			} else {
 				pdnsErr, ok := err.(*powerdns.Error)
 				if !ok {
 					logger.Error("Error not a PowerDNS error type!", zap.Error(err))
@@ -144,12 +148,15 @@ func trueUpReverseZones(networks []sls_common.Network, nameservers []common.Name
 							return
 						} else {
 							logger.Info("Added reverse zone", zap.Any("reverseZone", reverseZone))
+							reverseZones = append(reverseZones, reverseZone)
 						}
+					} else {
+						logger.Error("Got unknown PowerDNS error!", zap.Any("pdnsErr", pdnsErr))
 					}
 				}
 			}
 
-			reverseZones = append(reverseZones, reverseZone)
+			// TODO: Add logic to make sure all the details are correct and remove reverse zones if necessary.
 		}
 	}
 
@@ -611,19 +618,21 @@ func trueUpDNS() {
 		nameserverRRsets = append(nameserverRRsets, common.GetNameserverRRset(masterNameserver))
 
 		nameServers := []common.Nameserver{masterNameserver}
-		for _, slaveServer := range strings.Split(*slaveServers, ",") {
-			nameserverSplit := strings.Split(slaveServer, "/")
-			if len(nameserverSplit) != 2 {
-				logger.Fatal("Slave nameserver does not have FQDN/IP format!",
-					zap.String("slaveServer", slaveServer))
-			}
-			slaveNameserver := common.Nameserver{
-				FQDN: nameserverSplit[0],
-				IP:   nameserverSplit[1],
-			}
+		if *slaveServers != "" {
+			for _, slaveServer := range strings.Split(*slaveServers, ",") {
+				nameserverSplit := strings.Split(slaveServer, "/")
+				if len(nameserverSplit) != 2 {
+					logger.Fatal("Slave nameserver does not have FQDN/IP format!",
+						zap.String("slaveServer", slaveServer))
+				}
+				slaveNameserver := common.Nameserver{
+					FQDN: nameserverSplit[0],
+					IP:   nameserverSplit[1],
+				}
 
-			nameServers = append(nameServers, slaveNameserver)
-			nameserverRRsets = append(nameserverRRsets, common.GetNameserverRRset(slaveNameserver))
+				nameServers = append(nameServers, slaveNameserver)
+				nameserverRRsets = append(nameserverRRsets, common.GetNameserverRRset(slaveNameserver))
+			}
 		}
 
 		var allMasterZones []*powerdns.Zone

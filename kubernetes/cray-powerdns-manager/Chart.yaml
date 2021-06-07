@@ -6,4 +6,4 @@ dependencies:
     version: "~2.4.5"
     repository: "@cray-internal"
 home: "CASMNET/powerdns-manager"
-version: 0.1.0
+version: 0.1.1

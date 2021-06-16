@@ -19,7 +19,7 @@ cray-service:
         - name: SLAVE_SERVERS
           valueFrom:
             configMapKeyRef:
-              name: cray-powerdns-credentials
+              name: cray-powerdns-manager-config
               key:  slave_servers
         - name:  PDNS_URL
           value: "http://cray-dns-powerdns-api:8081"

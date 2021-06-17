@@ -3,4 +3,4 @@ kind: ConfigMap
 metadata:
   name: cray-powerdns-manager-config
 data:
-  slave_servers: {{ .Values.manager.slave_servers }}
+  slave_servers: {{ .Values.manager.slave_servers | default "" | quote }}

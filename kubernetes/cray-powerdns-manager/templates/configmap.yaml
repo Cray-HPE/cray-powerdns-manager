@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cray-powerdns-manager-config
+data:
+  slave_servers: {{ .Values.manager.slave_servers | default "" | quote }}
+  base_domain: {{ required "base_domain is not set in customizations.yaml" .Values.manager.base_domain }}

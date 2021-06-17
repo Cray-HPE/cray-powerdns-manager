@@ -1,19 +1,9 @@
 cray-service:
-  type: "Deployment"
-  nameOverride: "cray-powerdns-manager"
-  fullnameOverride: "cray-powerdns-manager"
+  type:               "Deployment"
+  nameOverride:       "cray-powerdns-manager"
+  fullnameOverride:   "cray-powerdns-manager"
   serviceAccountName: "jobs-watcher"
-  replicaCount: 1
-  affinity:
-    podAntiAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-      - topologyKey: kubernetes.io/hostname
-        labelSelector:
-          matchExpressions:
-            - key: app.kubernetes.io/name
-              operator: In
-              values:
-              - cray-powerdns-manager
+  replicaCount:       1
   strategy:
     type: Recreate
   containers:
@@ -21,28 +11,44 @@ cray-service:
       name: "cray-powerdns-manager"
       image:
         repository: "cray/powerdns-manager"
-        pullPolicy: Always
+        #pullPolicy: Always
       ports:
-        - name: http
+        - name:          http
           containerPort: 8080
       env:
+        - name: BASE_DOMAIN
+          valueFrom:
+            configMapKeyRef:
+              name: cray-powerdns-manager-config
+              key: base_domain
         - name: SLAVE_SERVERS
-          value: ""
-        - name: PDNS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: cray-powerdns-manager-config
+              key:  slave_servers
+        - name:  PDNS_URL
           value: "http://cray-dns-powerdns-api:8081"
+        - name: PDNS_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: cray-powerdns-credentials
+              key:  api_key
       livenessProbe:
         httpGet:
           port: 8080
           path: /v1/liveness
         initialDelaySeconds: 10
-        periodSeconds: 30
+        periodSeconds:       30
       readinessProbe:
         httpGet:
           port: 8080
           path: /v1/readiness
         initialDelaySeconds: 15
-        periodSeconds: 30
+        periodSeconds:       30
   ingress:
     enabled: true
-    prefix: "/apis/powerdns-manager/"
-    uri: "/"
+    prefix:  "/apis/powerdns-manager/"
+    uri:     "/"
+
+manager:
+  slave_servers: ""

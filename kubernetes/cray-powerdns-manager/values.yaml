@@ -16,6 +16,11 @@ cray-service:
         - name:          http
           containerPort: 8080
       env:
+        - name: BASE_DOMAIN
+          valueFrom:
+            configMapKeyRef:
+              name: cray-powerdns-manager-config
+              key: base_domain
         - name: SLAVE_SERVERS
           valueFrom:
             configMapKeyRef:

@@ -10,7 +10,7 @@ cray-service:
     cray-powerdns-manager:
       name: "cray-powerdns-manager"
       image:
-        repository: "cray/powerdns-manager"
+        repository: "cray/cray-powerdns-manager"
         #pullPolicy: Always
       ports:
         - name:          http

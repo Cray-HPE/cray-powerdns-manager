@@ -82,11 +82,9 @@ func trueUpMasterZones(baseDomain string, networks []sls_common.Network,
 		nameserverRRSets = append(nameserverRRSets, nameserverRRSet)
 	}
 
-	// First and foremost, check to make sure there is a master zone for the base domain. We won't add this to the
-	// return set of master zones because none of the records should belong to the base domain, they should all be
-	// fully qualified with their appropriate network.
-	_ = ensureMasterZone(baseDomain, nameserverFQDNs, nameserverRRSets)
-	//masterZones = append(masterZones, baseMasterZone)
+	// First and foremost, check to make sure there is a master zone for the base domain.
+	baseMasterZone := ensureMasterZone(baseDomain, nameserverFQDNs, nameserverRRSets)
+	masterZones = append(masterZones, baseMasterZone)
 
 	// Now make sure there is a master zone for each of the networks retrieved from SLS.
 	for _, network := range networks {
@@ -635,7 +633,7 @@ func trueUpDNS() {
 			}
 		}
 
-		var allMasterZones []*powerdns.Zone
+		var allMasterZones common.PowerDNSZones
 		var finalRRSet []powerdns.RRset
 
 		networks, err := getSLSNetworks()

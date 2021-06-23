@@ -1,6 +1,9 @@
 package common
 
-import "net"
+import (
+	"github.com/joeig/go-powerdns/v2"
+	"net"
+)
 
 const rdnsDomain = ".in-addr.arpa"
 
@@ -13,3 +16,5 @@ type NetworkNameCIDRMap struct {
 	Name string
 	CIDR *net.IPNet
 }
+
+type PowerDNSZones []*powerdns.Zone

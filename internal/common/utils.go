@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/joeig/go-powerdns/v2"
 	"reflect"
+	"sort"
 	sls_common "stash.us.cray.com/HMS/hms-sls/pkg/sls-common"
 	"strings"
 )
@@ -83,7 +84,30 @@ func RRsetsEqual(a powerdns.RRset, b powerdns.RRset) bool {
 	return true
 }
 
-func GetZoneForRRSet(rrSet powerdns.RRset, zones []*powerdns.Zone) *string {
+// Sorting functions for arrays of zones.
+
+func (zones PowerDNSZones) Len() int {
+	return len(zones)
+}
+func (zones PowerDNSZones) Swap(i, j int) {
+	zones[i], zones[j] = zones[j], zones[i]
+}
+func (zones PowerDNSZones) Less(i, j int) bool {
+	iName := *zones[i].Name
+	jName := *zones[j].Name
+
+	// When trying to find the correct zone the goal is always to find the zone with the maximal matching suffix.
+	// To do this, we apply a naive approach algorithmically and sort the zones by length.
+	// Given two zones i and j with common suffix if the length of i is less than j then by definition i has a
+	// potential greater suffix length than j. In a sequential search of a list of strings sorted by length descending
+	// we can be guaranteed that the maximally matching zone will appear first.
+	return len(iName) > len(jName)
+}
+
+func GetZoneForRRSet(rrSet powerdns.RRset, zones PowerDNSZones) *string {
+	// Have to reverse sort the zones to make sure we match maximal prefix first.
+	sort.Sort(zones)
+
 	for _, zone := range zones {
 		if strings.HasSuffix(*rrSet.Name, *zone.Name) {
 			return zone.Name

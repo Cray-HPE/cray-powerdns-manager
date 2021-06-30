@@ -32,7 +32,7 @@ cray-service:
           valueFrom:
             secretKeyRef:
               name: cray-powerdns-credentials
-              key:  api_key
+              key:  pdns_api_key
       livenessProbe:
         httpGet:
           port: 8080

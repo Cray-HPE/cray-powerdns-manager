@@ -37,7 +37,7 @@ services:
     depends_on:
       - primary-mariadb
     image: psitrax/powerdns:v4.3
-    hostname: ns1
+    hostname: master
     ports:
       - "53:53"
       - "53:53/udp"
@@ -61,18 +61,18 @@ services:
         "--log-dns-details=yes",
         "--query-logging=yes",
         "--default-soa-edit=INCEPTION-INCREMENT",
-        "--allow-axfr-ips=192.168.53.5/32",
+        "--allow-axfr-ips=0.0.0.0/0",
     ]
     networks:
       pdns:
         ipv4_address: 192.168.53.4
         aliases:
-          - ns1.shasta.dev.cray.com
+          - master
   secondary-powerdns:
     depends_on:
       - secondary-mariadb
     image: psitrax/powerdns:v4.3
-    hostname: ns2
+    hostname: slave1
     ports:
       - "5053:53"
       - "5053:53/udp"
@@ -106,4 +106,4 @@ services:
       pdns:
         ipv4_address: 192.168.53.5
         aliases:
-          - ns2.shasta.dev.cray.com
+          - slave1

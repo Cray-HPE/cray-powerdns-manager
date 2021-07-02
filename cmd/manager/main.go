@@ -22,10 +22,10 @@ import (
 var (
 	baseDomain = flag.String("base_domain", "shasta.dev.cray.com",
 		"Base master domain from which to build all other records on top of")
-	masterServer = flag.String("master_server", "ns1.shasta.dev.cray.com/192.168.53.4",
-		"FQDN/IP of this master DNS server")
-	slaveServers = flag.String("slave_servers", "ns2.shasta.dev.cray.com/192.168.53.5",
-		"Comma separated list of slave DNS FQDNs/IPs")
+	masterServer = flag.String("master_server", "master/192.168.53.4",
+		"name/IP of this master DNS server")
+	slaveServers = flag.String("slave_servers", "slave1/192.168.53.5",
+		"Comma separated list of slave DNS name/IPs")
 
 	slsURL = flag.String("sls_url", "http://cray-sls", "System Layout Service URL")
 	hsmURL = flag.String("hsm_url", "http://cray-smd", "State Manager URL")

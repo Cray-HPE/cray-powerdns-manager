@@ -51,4 +51,5 @@ cray-service:
     uri:     "/"
 
 manager:
+  master_server: ""
   slave_servers: ""

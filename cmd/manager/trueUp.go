@@ -592,17 +592,19 @@ func trueUpDNS() {
 	var nameserverRRsets []powerdns.RRset
 	var nameServers []common.Nameserver
 
-	masterNameserverSplit := strings.Split(*masterServer, "/")
-	if len(masterNameserverSplit) != 2 {
-		logger.Fatal("Master nameserver does not have name/IP format!",
-			zap.String("masterServer", *masterServer))
+	if *masterServer != "" {
+		masterNameserverSplit := strings.Split(*masterServer, "/")
+		if len(masterNameserverSplit) != 2 {
+			logger.Fatal("Master nameserver does not have name/IP format!",
+				zap.String("masterServer", *masterServer))
+		}
+		masterNameserver := common.Nameserver{
+			FQDN: fmt.Sprintf("%s.%s", masterNameserverSplit[0], *baseDomain),
+			IP:   masterNameserverSplit[1],
+		}
+		nameServers = append(nameServers, masterNameserver)
+		nameserverRRsets = append(nameserverRRsets, common.GetNameserverRRset(masterNameserver))
 	}
-	masterNameserver := common.Nameserver{
-		FQDN: fmt.Sprintf("%s.%s", masterNameserverSplit[0], *baseDomain),
-		IP:   masterNameserverSplit[1],
-	}
-	nameServers = append(nameServers, masterNameserver)
-	nameserverRRsets = append(nameserverRRsets, common.GetNameserverRRset(masterNameserver))
 
 	if *slaveServers != "" {
 		for _, slaveServer := range strings.Split(*slaveServers, ",") {

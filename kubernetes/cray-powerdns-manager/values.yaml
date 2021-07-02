@@ -21,6 +21,11 @@ cray-service:
             configMapKeyRef:
               name: cray-powerdns-manager-config
               key: base_domain
+        - name: MASTER_SERVER
+          valueFrom:
+            configMapKeyRef:
+              name: cray-powerdns-manager-config
+              key:  master_server
         - name: SLAVE_SERVERS
           valueFrom:
             configMapKeyRef:

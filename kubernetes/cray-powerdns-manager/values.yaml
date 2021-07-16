@@ -38,6 +38,8 @@ cray-service:
             secretKeyRef:
               name: cray-powerdns-credentials
               key:  pdns_api_key
+        - name: KEY_DIRECTORY
+          value: "/keys"
       livenessProbe:
         httpGet:
           port: 8080
@@ -50,6 +52,14 @@ cray-service:
           path: /v1/readiness
         initialDelaySeconds: 15
         periodSeconds:       30
+      volumeMounts:
+        - name: dnssec-keys
+          mountPath: "/keys"
+          readOnly: true
+  volumes:
+    - name: dnssec-keys
+      secret:
+        secretName: dnssec-keys
   ingress:
     enabled: true
     prefix:  "/apis/powerdns-manager/"
@@ -58,3 +68,4 @@ cray-service:
 manager:
   master_server: ""
   slave_servers: ""
+  notify_domains: ""

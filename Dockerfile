@@ -37,7 +37,7 @@ WORKDIR /build
 COPY cmd        cmd
 COPY internal   internal
 #COPY pkg     pkg
-#COPY vendor  vendor
+COPY vendor  vendor
 
 # Copy the Go module files.
 COPY go.mod .
@@ -46,7 +46,7 @@ COPY go.sum .
 ### Build Stage ###
 FROM base AS builder
 
-#ARG go_build_args="-mod=vendor"
+ARG go_build_args="-mod=vendor"
 
 RUN set -ex \
     && go build ${go_build_args} -v -o /usr/local/bin/cray-powerdns-manager ./cmd/manager \

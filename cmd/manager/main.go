@@ -24,8 +24,12 @@ var (
 		"Base master domain from which to build all other records on top of")
 	masterServer = flag.String("master_server", "master/192.168.53.4",
 		"name/IP of this master DNS server")
-	slaveServers = flag.String("slave_servers", "slave1/192.168.53.5",
+	slaveServers = flag.String("slave_servers", "slave/192.168.53.5",
 		"Comma separated list of slave DNS name/IPs")
+	notifyZones = flag.String("notify_zones", "",
+		"Comma separated list of zones for which a DNS NOTIFY should be sent to the slave servers")
+	keyDirectory = flag.String("key_directory", "./keys",
+		"Path to directory containing ICS formatted private DNSSEC keys for one or more zones")
 
 	slsURL = flag.String("sls_url", "http://cray-sls", "System Layout Service URL")
 	hsmURL = flag.String("hsm_url", "http://cray-smd", "State Manager URL")

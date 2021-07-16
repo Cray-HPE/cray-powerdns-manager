@@ -18,3 +18,8 @@ type NetworkNameCIDRMap struct {
 }
 
 type PowerDNSZones []*powerdns.Zone
+
+type DNSSECKey struct {
+	ZoneName string
+	PrivateKey string
+}

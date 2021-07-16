@@ -26,10 +26,18 @@ func ensureMasterZone(zoneName string, nameserverFQDNs []string, rrSets []powerd
 			return
 		} else {
 			if pdnsErr.StatusCode == http.StatusNotFound {
+				// Figure out if this zone has a custom DNSSEC key.
+				var customDNSSECKey *common.DNSSECKey
+				for _, key := range DNSSecKeys {
+					if strings.TrimSuffix(zoneName, ".") == key.ZoneName {
+						customDNSSECKey = &key
+					}
+				}
+
 				zone := &powerdns.Zone{
 					Name:        &zoneName,
 					Kind:        powerdns.ZoneKindPtr(powerdns.MasterZoneKind),
-					DNSsec:      powerdns.Bool(true),
+					DNSsec:      powerdns.Bool(customDNSSECKey == nil),
 					Nameservers: nameserverFQDNs,
 					RRsets:      rrSets,
 				}
@@ -41,6 +49,15 @@ func ensureMasterZone(zoneName string, nameserverFQDNs []string, rrSets []powerd
 					return
 				} else {
 					logger.Info("Added master zone", zap.String("zoneName", zoneName))
+
+					// Now that the zone is added we check to see if we found a custom DNSSEC key and if so upload that.
+					if customDNSSECKey != nil {
+						err = AddCryptokeyToZone(*customDNSSECKey)
+
+						if err != nil {
+							logger.Error("Failed to add custom DNSSEC key to zone!", zap.Error(err))
+						}
+					}
 				}
 
 				return
@@ -53,7 +70,7 @@ func ensureMasterZone(zoneName string, nameserverFQDNs []string, rrSets []powerd
 		// TODO: Add logic to update the master zone if necessary.
 	}
 
-	logger.Debug("Master zone already exists.")
+	logger.Debug("Master zone already exists.", zap.String("masterZone.name", *masterZone.Name))
 
 	return
 }
@@ -161,6 +178,14 @@ func trueUpReverseZones(networks []sls_common.Network,
 					return
 				} else {
 					if pdnsErr.StatusCode == http.StatusNotFound {
+						// Figure out if this zone has a custom DNSSEC key.
+						var customDNSSECKey *common.DNSSECKey
+						for _, key := range DNSSecKeys {
+							if strings.TrimSuffix(reverseZoneName, ".") == key.ZoneName {
+								customDNSSECKey = &key
+							}
+						}
+
 						reverseZone = &powerdns.Zone{
 							Name:        &reverseZoneName,
 							Kind:        powerdns.ZoneKindPtr(powerdns.MasterZoneKind),
@@ -175,6 +200,17 @@ func trueUpReverseZones(networks []sls_common.Network,
 						} else {
 							logger.Info("Added reverse zone", zap.Any("reverseZone", reverseZone))
 							reverseZones = append(reverseZones, reverseZone)
+
+							// Now that the zone is added we check to see if we found a custom DNSSEC key and if so
+							// upload that.
+							if customDNSSECKey != nil {
+								err = AddCryptokeyToZone(*customDNSSECKey)
+
+								if err != nil {
+									logger.Error("Failed to add custom DNSSEC key to reverse zone!",
+										zap.Error(err))
+								}
+							}
 						}
 					} else {
 						logger.Error("Got unknown PowerDNS error!", zap.Any("pdnsErr", pdnsErr))

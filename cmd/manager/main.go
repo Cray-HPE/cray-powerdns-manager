@@ -164,6 +164,12 @@ func main() {
 	pdns = powerdns.NewClient(*pdnsURL, "localhost", map[string]string{"X-API-Key": *pdnsAPIKey},
 		httpClient.HTTPClient)
 
+	// Parse any DNSSEC keys.
+	err := ParseDNSSecKeys()
+	if err != nil {
+		logger.Error("Failed to parse DNSSEC keys directory!", zap.Error(err))
+	}
+
 	// Kick off the true up loop.
 	WaitGroup.Add(1)
 	logger.Info("Starting true up loop.")

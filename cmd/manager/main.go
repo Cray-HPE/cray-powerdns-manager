@@ -63,6 +63,8 @@ var (
 	trueUpMtx        sync.Mutex
 
 	token string
+
+	notifyZonesArray []string
 )
 
 func setupLogging() {
@@ -168,6 +170,20 @@ func main() {
 	err := ParseDNSSecKeys()
 	if err != nil {
 		logger.Error("Failed to parse DNSSEC keys directory!", zap.Error(err))
+	} else {
+		for _, key := range DNSSecKeys {
+			logger.Info("Parsed DNSSEC key", zap.Any("key", key))
+		}
+	}
+
+	// Compute an array of the zones for which to notify.
+	if *notifyZones != "" {
+		notifyZonesArray = strings.Split(*notifyZones, ",")
+	}
+	if len(notifyZonesArray) == 0 {
+		logger.Info("Sending DNS NOTIFY for all zones")
+	} else {
+		logger.Info("Sending DNS NOTIFY for zones", zap.Strings("notifyZonesArray", notifyZonesArray))
 	}
 
 	// Kick off the true up loop.

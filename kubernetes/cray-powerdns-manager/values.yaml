@@ -11,7 +11,7 @@ cray-service:
       name: "cray-powerdns-manager"
       image:
         repository: "cray/cray-powerdns-manager"
-        #pullPolicy: Always
+        pullPolicy: Always
       ports:
         - name:          http
           containerPort: 8080
@@ -31,6 +31,11 @@ cray-service:
             configMapKeyRef:
               name: cray-powerdns-manager-config
               key:  slave_servers
+        - name: NOTIFY_ZONES
+          valueFrom:
+            configMapKeyRef:
+              name: cray-powerdns-manager-config
+              key:  notify_zones
         - name:  PDNS_URL
           value: "http://cray-dns-powerdns-api:8081"
         - name: PDNS_API_KEY
@@ -56,10 +61,6 @@ cray-service:
         - name: dnssec-keys
           mountPath: "/keys"
           readOnly: true
-  volumes:
-    - name: dnssec-keys
-      secret:
-        secretName: dnssec-keys
   ingress:
     enabled: true
     prefix:  "/apis/powerdns-manager/"
@@ -68,4 +69,4 @@ cray-service:
 manager:
   master_server: ""
   slave_servers: ""
-  notify_domains: ""
+  notify_zones: ""

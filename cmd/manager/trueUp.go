@@ -86,12 +86,6 @@ func trueUpMasterZones(baseDomain string, networks []sls_common.Network,
 		masterZoneNames = append(masterZoneNames, fullDomain)
 	}
 
-	// Compute an array of the zones for which to notify.
-	var notifyZonesArray []string
-	if *notifyZones != "" {
-		notifyZonesArray = strings.Split(*notifyZones, ",")
-	}
-
 	// Every zone should have at least the master nameserver.
 	masterNameserverRRSet := common.GetNameserverRRset(masterNameserver)
 	baseNameserverFQDNs := []string{*masterNameserverRRSet.Name}
@@ -115,7 +109,7 @@ func trueUpMasterZones(baseDomain string, networks []sls_common.Network,
 		}
 
 		masterZone := ensureMasterZone(masterZoneName, nameserverFQDNs, nameserverRRSets)
-		if masterZone.ID != nil {
+		if masterZone != nil && masterZone.ID != nil {
 			masterZones = append(masterZones, masterZone)
 		}
 	}
@@ -147,12 +141,6 @@ func trueUpReverseZones(networks []sls_common.Network,
 			masterNameserverRRSet := common.GetNameserverRRset(masterNameserver)
 			nameserverFQDNs = append(nameserverFQDNs, *masterNameserverRRSet.Name)
 			nameserverRRSets = append(nameserverRRSets, masterNameserverRRSet)
-
-			// Compute an array of the zones for which to notify.
-			var notifyZonesArray []string
-			if *notifyZones != "" {
-				notifyZonesArray = strings.Split(*notifyZones, ",")
-			}
 
 			// Now figure out if this zone is enabled for zone transfers and if so add the slave server(s) to the
 			// name server list.

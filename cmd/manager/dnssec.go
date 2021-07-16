@@ -5,6 +5,7 @@ import (
 	"github.com/joeig/go-powerdns/v2"
 	"io/ioutil"
 	"stash.us.cray.com/CSM/cray-powerdns-manager/internal/common"
+	"strings"
 )
 
 var (
@@ -22,6 +23,10 @@ func ParseDNSSecKeys() error {
 	}
 
 	for _, privateKeyFile := range files {
+		if privateKeyFile.IsDir() || strings.HasPrefix(privateKeyFile.Name(), ".") {
+			continue
+		}
+
 		privateKeyData, err := ioutil.ReadFile(fmt.Sprintf("%s/%s", *keyDirectory, privateKeyFile.Name()))
 		if err != nil {
 			return fmt.Errorf("failed to read key file: %w", err)

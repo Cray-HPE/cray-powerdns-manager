@@ -6,3 +6,4 @@ data:
   master_server: {{ .Values.manager.master_server | default "" | quote }}
   slave_servers: {{ .Values.manager.slave_servers | default "" | quote }}
   base_domain: {{ required "base_domain is not set in customizations.yaml" .Values.manager.base_domain }}
+  notify_zones: {{ .Values.manager.notify_zones | default "" | quote }}

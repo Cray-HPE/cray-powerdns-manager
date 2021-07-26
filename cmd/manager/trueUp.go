@@ -26,10 +26,18 @@ func ensureMasterZone(zoneName string, nameserverFQDNs []string, rrSets []powerd
 			return
 		} else {
 			if pdnsErr.StatusCode == http.StatusNotFound {
+				// Figure out if this zone has a custom DNSSEC key.
+				var customDNSSECKey *common.DNSSECKey
+				for _, key := range DNSSecKeys {
+					if strings.TrimSuffix(zoneName, ".") == key.ZoneName {
+						customDNSSECKey = &key
+					}
+				}
+
 				zone := &powerdns.Zone{
 					Name:        &zoneName,
 					Kind:        powerdns.ZoneKindPtr(powerdns.MasterZoneKind),
-					DNSsec:      powerdns.Bool(true),
+					DNSsec:      powerdns.Bool(customDNSSECKey == nil),
 					Nameservers: nameserverFQDNs,
 					RRsets:      rrSets,
 				}
@@ -41,6 +49,15 @@ func ensureMasterZone(zoneName string, nameserverFQDNs []string, rrSets []powerd
 					return
 				} else {
 					logger.Info("Added master zone", zap.String("zoneName", zoneName))
+
+					// Now that the zone is added we check to see if we found a custom DNSSEC key and if so upload that.
+					if customDNSSECKey != nil {
+						err = AddCryptokeyToZone(*customDNSSECKey)
+
+						if err != nil {
+							logger.Error("Failed to add custom DNSSEC key to zone!", zap.Error(err))
+						}
+					}
 				}
 
 				return
@@ -49,71 +66,67 @@ func ensureMasterZone(zoneName string, nameserverFQDNs []string, rrSets []powerd
 				return
 			}
 		}
+
+		// TODO: Add logic to update the master zone if necessary.
 	}
 
-	logger.Debug("Master zone already exists.")
+	logger.Debug("Master zone already exists.", zap.String("masterZone.name", *masterZone.Name))
 
 	return
 }
 
 func trueUpMasterZones(baseDomain string, networks []sls_common.Network,
-	nameservers []common.Nameserver) (masterZones []*powerdns.Zone) {
-	// Compute all of the information we need concerning nameservers.
-	var nameserverFQDNs []string
-	var nameserverRRSets []powerdns.RRset
-
-	// We have to create A records for all the name servers otherwise it won't let us create the zone.
-	for _, nameserver := range nameservers {
-		canonicalName := common.MakeDomainCanonical(nameserver.FQDN)
-		nameserverFQDNs = append(nameserverFQDNs, canonicalName)
-
-		nameserverRRSet := powerdns.RRset{
-			Name: &canonicalName,
-			Type: powerdns.RRTypePtr(powerdns.RRTypeA),
-			TTL:  powerdns.Uint32(3600),
-			Records: []powerdns.Record{
-				{
-					Content:  powerdns.String(nameserver.IP),
-					Disabled: powerdns.Bool(false),
-				},
-			},
-		}
-
-		nameserverRRSets = append(nameserverRRSets, nameserverRRSet)
-	}
-
-	// First and foremost, check to make sure there is a master zone for the base domain.
-	baseMasterZone := ensureMasterZone(baseDomain, nameserverFQDNs, nameserverRRSets)
-	if baseMasterZone.ID != nil {
-		masterZones = append(masterZones, baseMasterZone)
-	}
-
-	// Now make sure there is a master zone for each of the networks retrieved from SLS.
+	masterNameserver common.Nameserver, slaveNameservers []common.Nameserver) (masterZones []*powerdns.Zone) {
+	// Create a list of all the master zones.
+	masterZoneNames := []string{baseDomain}
 	for _, network := range networks {
 		networkDomain := strings.ToLower(network.Name)
 		fullDomain := fmt.Sprintf("%s.%s", networkDomain, baseDomain)
 
-		networkMasterZone := ensureMasterZone(fullDomain, nameserverFQDNs, nil)
-		if networkMasterZone != nil {
-			masterZones = append(masterZones, networkMasterZone)
+		masterZoneNames = append(masterZoneNames, fullDomain)
+	}
+
+	// Every zone should have at least the master nameserver.
+	masterNameserverRRSet := common.GetNameserverRRset(masterNameserver)
+	baseNameserverFQDNs := []string{*masterNameserverRRSet.Name}
+
+	for _, masterZoneName := range masterZoneNames {
+		nameserverFQDNs := baseNameserverFQDNs
+		var nameserverRRSets []powerdns.RRset
+
+		// If this is is the base domain we need treat it a little differently in that we need to include RRsets for
+		// the A record of the master server otherwise it won't let us create the zone.
+		if masterZoneName == baseDomain {
+			nameserverRRSets = append(nameserverRRSets, masterNameserverRRSet)
+		}
+
+		// Now figure out if this zone is enabled for zone transfers and if so add the slave server(s) to the
+		// name server list.
+		if len(notifyZonesArray) == 0 || common.SliceContains(masterZoneName, notifyZonesArray) {
+			for _, nameserver := range slaveNameservers {
+				nameserverFQDNs = append(nameserverFQDNs, nameserver.FQDN)
+			}
+		}
+
+		masterZone := ensureMasterZone(masterZoneName, nameserverFQDNs, nameserverRRSets)
+		if masterZone != nil && masterZone.ID != nil {
+			masterZones = append(masterZones, masterZone)
 		}
 	}
 
-	// Now remove any zones that don't correspond to networks from SLS.
-
+	// TODO: Remove any zones that don't correspond to networks from SLS.
 
 	return
 }
 
-func trueUpReverseZones(networks []sls_common.Network, nameservers []common.Nameserver) (reverseZones []*powerdns.Zone,
+func trueUpReverseZones(networks []sls_common.Network,
+	masterNameserver common.Nameserver, slaveNameservers []common.Nameserver) (reverseZones []*powerdns.Zone,
 	err error) {
-	var nameserverFQDNs []string
-	for _, nameserver := range nameservers {
-		canonicalName := common.MakeDomainCanonical(nameserver.FQDN)
-		nameserverFQDNs = append(nameserverFQDNs, canonicalName)
-	}
 	for _, network := range networks {
 		for _, ipRange := range network.IPRanges {
+			var nameserverFQDNs []string
+			var nameserverRRSets []powerdns.RRset
+
 			// Compute the correct name.
 			var cidr *net.IPNet
 			_, cidr, err = net.ParseCIDR(ipRange)
@@ -124,9 +137,27 @@ func trueUpReverseZones(networks []sls_common.Network, nameservers []common.Name
 			cidrParts := strings.Split(cidr.IP.String(), ".")
 			reverseZoneName := common.GetReverseName(cidrParts)
 
+			// This master name server is always listed as one of the nameservers.
+			masterNameserverRRSet := common.GetNameserverRRset(masterNameserver)
+			nameserverFQDNs = append(nameserverFQDNs, *masterNameserverRRSet.Name)
+			nameserverRRSets = append(nameserverRRSets, masterNameserverRRSet)
+
+			// Now figure out if this zone is enabled for zone transfers and if so add the slave server(s) to the
+			// name server list.
+			if len(notifyZonesArray) == 0 || common.SliceContains(reverseZoneName, notifyZonesArray) {
+				for _, nameserver := range slaveNameservers {
+					nameserverRRSet := common.GetNameserverRRset(nameserver)
+
+					nameserverFQDNs = append(nameserverFQDNs, *nameserverRRSet.Name)
+					nameserverRRSets = append(nameserverRRSets, nameserverRRSet)
+				}
+			}
+
+
 			var reverseZone *powerdns.Zone
 			reverseZone, err = pdns.Zones.Get(reverseZoneName)
 			if err == nil {
+				// TODO: Add logic to make sure all the details are correct and remove reverse zones if necessary.
 				reverseZones = append(reverseZones, reverseZone)
 			} else {
 				pdnsErr, ok := err.(*powerdns.Error)
@@ -135,6 +166,14 @@ func trueUpReverseZones(networks []sls_common.Network, nameservers []common.Name
 					return
 				} else {
 					if pdnsErr.StatusCode == http.StatusNotFound {
+						// Figure out if this zone has a custom DNSSEC key.
+						var customDNSSECKey *common.DNSSECKey
+						for _, key := range DNSSecKeys {
+							if strings.TrimSuffix(reverseZoneName, ".") == key.ZoneName {
+								customDNSSECKey = &key
+							}
+						}
+
 						reverseZone = &powerdns.Zone{
 							Name:        &reverseZoneName,
 							Kind:        powerdns.ZoneKindPtr(powerdns.MasterZoneKind),
@@ -149,14 +188,23 @@ func trueUpReverseZones(networks []sls_common.Network, nameservers []common.Name
 						} else {
 							logger.Info("Added reverse zone", zap.Any("reverseZone", reverseZone))
 							reverseZones = append(reverseZones, reverseZone)
+
+							// Now that the zone is added we check to see if we found a custom DNSSEC key and if so
+							// upload that.
+							if customDNSSECKey != nil {
+								err = AddCryptokeyToZone(*customDNSSECKey)
+
+								if err != nil {
+									logger.Error("Failed to add custom DNSSEC key to reverse zone!",
+										zap.Error(err))
+								}
+							}
 						}
 					} else {
 						logger.Error("Got unknown PowerDNS error!", zap.Any("pdnsErr", pdnsErr))
 					}
 				}
 			}
-
-			// TODO: Add logic to make sure all the details are correct and remove reverse zones if necessary.
 		}
 	}
 
@@ -589,8 +637,9 @@ func trueUpDNS() {
 
 	defer WaitGroup.Done()
 
-	var nameserverRRsets []powerdns.RRset
-	var nameServers []common.Nameserver
+
+	var masterNameserver common.Nameserver
+	var slaveNameservers []common.Nameserver
 
 	if *masterServer != "" {
 		masterNameserverSplit := strings.Split(*masterServer, "/")
@@ -598,12 +647,10 @@ func trueUpDNS() {
 			logger.Fatal("Master nameserver does not have name/IP format!",
 				zap.String("masterServer", *masterServer))
 		}
-		masterNameserver := common.Nameserver{
+		masterNameserver = common.Nameserver{
 			FQDN: fmt.Sprintf("%s.%s", masterNameserverSplit[0], *baseDomain),
 			IP:   masterNameserverSplit[1],
 		}
-		nameServers = append(nameServers, masterNameserver)
-		nameserverRRsets = append(nameserverRRsets, common.GetNameserverRRset(masterNameserver))
 	}
 
 	if *slaveServers != "" {
@@ -614,12 +661,11 @@ func trueUpDNS() {
 					zap.String("slaveServer", slaveServer))
 			}
 			slaveNameserver := common.Nameserver{
-				FQDN: fmt.Sprintf("%s.%s", nameserverSplit[0], *baseDomain),
+				FQDN: common.MakeDomainCanonical(nameserverSplit[0]),
 				IP:   nameserverSplit[1],
 			}
 
-			nameServers = append(nameServers, slaveNameserver)
-			nameserverRRsets = append(nameserverRRsets, common.GetNameserverRRset(slaveNameserver))
+			slaveNameservers = append(slaveNameservers, slaveNameserver)
 		}
 	}
 
@@ -629,7 +675,7 @@ func trueUpDNS() {
 		select {
 		case <-trueUpShutdown:
 			return
-		case <-trueUpRunNow: // For those impatient type.
+		case <-trueUpRunNow: // For those impatient types.
 		case <-time.After(time.Duration(*trueUpSleepInterval) * time.Second):
 			logger.Debug("Running true up loop.")
 		}
@@ -658,10 +704,10 @@ func trueUpDNS() {
 		}
 
 		// Build/get all necessary master zones.
-		masterZones := trueUpMasterZones(*baseDomain, networks, nameServers)
+		masterZones := trueUpMasterZones(*baseDomain, networks, masterNameserver, slaveNameservers)
 
 		// True up reverse zones.
-		reverseZones, err := trueUpReverseZones(networks, nameServers)
+		reverseZones, err := trueUpReverseZones(networks, masterNameserver, slaveNameservers)
 		if err != nil {
 			logger.Error("Failed to true up reverse zones!", zap.Error(err))
 		}
@@ -702,16 +748,21 @@ func trueUpDNS() {
 
 		// At this point we have computed every correct RRSet necessary. Now the only task is to add the ones that are
 		// missing and remove the ones that shouldn't be there.
+		// TODO: Add the remove entries.
 		finalRRSet = append(finalRRSet, staticRRSets...)
 		finalRRSet = append(finalRRSet, dynamicRRSets...)
 
 		// Force a sync to any slave servers if we did something.
 		if trueUpRRSets(finalRRSet, allMasterZones) {
-			result, err := pdns.Zones.Notify(*baseDomain)
-			if err != nil {
-				logger.Error("Failed to notify slave server(s)!", zap.Error(err))
-			} else {
-				logger.Info("Notified slave server(s)", zap.Any("result", result))
+			for _, masterZone := range allMasterZones {
+				result, err := pdns.Zones.Notify(*masterZone.Name)
+
+				notifyLogger := logger.With(zap.String("masterZone.name", *masterZone.Name))
+				if err != nil {
+					notifyLogger.Error("Failed to notify slave server(s) for zone!", zap.Error(err))
+				} else {
+					notifyLogger.Info("Notified slave server(s) for zone", zap.Any("result", result))
+				}
 			}
 		}
 

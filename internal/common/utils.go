@@ -125,9 +125,19 @@ func GetNameserverRRset(nameserver Nameserver) powerdns.RRset {
 		ChangeType: powerdns.ChangeTypePtr(powerdns.ChangeTypeReplace),
 		Records: []powerdns.Record{
 			{
-				Content:  powerdns.String(MakeDomainCanonical(nameserver.FQDN)),
+				Content:  powerdns.String(nameserver.IP),
 				Disabled: powerdns.Bool(false),
 			},
 		},
 	}
+}
+
+func SliceContains(needle string, haystack []string) bool {
+	for _, match := range haystack {
+		if needle == match {
+			return true
+		}
+	}
+
+	return false
 }

@@ -21,16 +21,16 @@ cray-service:
             configMapKeyRef:
               name: cray-powerdns-manager-config
               key: base_domain
-        - name: MASTER_SERVER
+        - name: PRIMARY_SERVER
           valueFrom:
             configMapKeyRef:
               name: cray-powerdns-manager-config
-              key:  master_server
-        - name: SLAVE_SERVERS
+              key:  primary_server
+        - name: SECONDARY_SERVERS
           valueFrom:
             configMapKeyRef:
               name: cray-powerdns-manager-config
-              key:  slave_servers
+              key:  secondary_servers
         - name: NOTIFY_ZONES
           valueFrom:
             configMapKeyRef:
@@ -67,6 +67,6 @@ cray-service:
     uri:     "/"
 
 manager:
-  master_server: ""
-  slave_servers: ""
+  primary_server: ""
+  secondary_servers: ""
   notify_zones: ""

@@ -22,10 +22,10 @@ import (
 var (
 	baseDomain = flag.String("base_domain", "shasta.dev.cray.com",
 		"Base master domain from which to build all other records on top of")
-	masterServer = flag.String("master_server", "master/192.168.53.4",
-		"name/IP of this master DNS server")
-	slaveServers = flag.String("slave_servers", "slave/192.168.53.5",
-		"Comma separated list of slave DNS name/IPs")
+	masterServer = flag.String("primary_server", "primary/192.168.53.4",
+		"name/IP of this primary DNS server")
+	slaveServers = flag.String("secondary_servers", "secondary/192.168.53.5",
+		"Comma separated list of secondary DNS name/IPs")
 	notifyZones = flag.String("notify_zones", "",
 		"Comma separated list of zones for which a DNS NOTIFY should be sent to the slave servers")
 	keyDirectory = flag.String("key_directory", "./keys",

@@ -2,6 +2,7 @@ cray-service:
   type:               "Deployment"
   nameOverride:       "cray-powerdns-manager"
   fullnameOverride:   "cray-powerdns-manager"
+  priorityClassName:  "csm-high-priority-service"
   serviceAccountName: "jobs-watcher"
   replicaCount:       1
   strategy:

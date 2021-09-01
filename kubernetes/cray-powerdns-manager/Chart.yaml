@@ -2,4 +2,4 @@ apiVersion: v1
 description: "Kubernetes Deployment for PowerDNS Manager"
 name: "cray-powerdns-manager"
 home: "CASMNET/powerdns-manager"
-version: 0.3.1
+version: 0.3.2

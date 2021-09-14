@@ -62,7 +62,7 @@ github.com/hashicorp/vault/sdk/helper/hclutil
 github.com/hashicorp/vault/sdk/helper/jsonutil
 github.com/hashicorp/vault/sdk/helper/parseutil
 github.com/hashicorp/vault/sdk/helper/strutil
-# github.com/joeig/go-powerdns/v2 v2.4.1 => github.com/SeanWallace/go-powerdns/v2 v2.4.1-0.20210716030559-372444227cfb
+# github.com/joeig/go-powerdns/v2 v2.4.1 => github.com/SeanWallace/go-powerdns/v2 v2.4.1-0.20210914015402-5c6aa3160920
 ## explicit
 github.com/joeig/go-powerdns/v2
 # github.com/json-iterator/go v1.1.11
@@ -197,4 +197,4 @@ stash.us.cray.com/HMS/hms-sls/pkg/sls-common
 ## explicit
 stash.us.cray.com/HMS/hms-smd/pkg/redfish
 stash.us.cray.com/HMS/hms-smd/pkg/sm
-# github.com/joeig/go-powerdns/v2 => github.com/SeanWallace/go-powerdns/v2 v2.4.1-0.20210716030559-372444227cfb
+# github.com/joeig/go-powerdns/v2 => github.com/SeanWallace/go-powerdns/v2 v2.4.1-0.20210914015402-5c6aa3160920

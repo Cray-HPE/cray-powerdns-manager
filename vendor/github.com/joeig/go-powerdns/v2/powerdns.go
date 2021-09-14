@@ -33,6 +33,7 @@ type Client struct {
 	Records    *RecordsService
 	Servers    *ServersService
 	Statistics *StatisticsService
+	TSIGKeys   *TSIGKeysService
 	Zones      *ZonesService
 }
 
@@ -66,6 +67,7 @@ func NewClient(baseURL string, vHost string, headers map[string]string, httpClie
 	c.Records = (*RecordsService)(&c.common)
 	c.Servers = (*ServersService)(&c.common)
 	c.Statistics = (*StatisticsService)(&c.common)
+	c.TSIGKeys = (*TSIGKeysService)(&c.common)
 	c.Zones = (*ZonesService)(&c.common)
 
 	return c

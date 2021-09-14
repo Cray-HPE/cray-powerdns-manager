@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"stash.us.cray.com/CSM/cray-powerdns-manager/internal/common"
 	"stash.us.cray.com/CSM/cray-powerdns-manager/internal/httpLogger"
 	"strings"
 	"sync"
@@ -167,12 +168,26 @@ func main() {
 		httpClient.HTTPClient)
 
 	// Parse any DNSSEC keys.
-	err := ParseDNSSecKeys()
+	err := ParseDNSKeys()
 	if err != nil {
 		logger.Error("Failed to parse DNSSEC keys directory!", zap.Error(err))
 	} else {
-		for _, key := range DNSSecKeys {
-			logger.Info("Parsed DNSSEC key", zap.Any("key", key))
+		for _, key := range DNSKeys {
+			if key.Type == common.TSIGKeyType {
+				logger.Info("Parsed TSIG key", zap.Any("key", key))
+			} else {
+				logger.Info("Parsed DNSSEC key", zap.Any("key", key))
+			}
+		}
+	}
+
+	// If there are any TSIG keys, load them into PowerDNS.
+	for _, key := range DNSKeys {
+		if key.Type == common.TSIGKeyType {
+			err := AddOrUpdateTSIGKey(key)
+			if err != nil {
+				logger.Error("Failed to add TSIG key!", zap.Error(err), zap.Any("key", key))
+			}
 		}
 	}
 

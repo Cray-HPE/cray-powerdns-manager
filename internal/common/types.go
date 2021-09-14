@@ -20,11 +20,18 @@ type NetworkNameCIDRMap struct {
 
 type PowerDNSZones []*powerdns.Zone
 
-type DNSSECKey struct {
-	ZoneName string
-	PrivateKey string
+type DNSKeyType int
+const(
+	DNSSecKeyType = iota
+	TSIGKeyType
+)
+
+type DNSKey struct {
+	Name string
+	Data string
+	Type DNSKeyType
 }
 
-func (key DNSSECKey) String() string {
-	return fmt.Sprintf("ZoneName: %s", key.ZoneName)
+func (key DNSKey) String() string {
+	return fmt.Sprintf("Name: %s", key.Name)
 }

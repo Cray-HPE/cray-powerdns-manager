@@ -27,19 +27,24 @@ func ensureMasterZone(zoneName string, nameserverFQDNs []string, rrSets []powerd
 		} else {
 			if pdnsErr.StatusCode == http.StatusNotFound {
 				// Figure out if this zone has a custom DNSSEC key.
-				var customDNSSECKey *common.DNSSECKey
-				for _, key := range DNSSecKeys {
-					if strings.TrimSuffix(zoneName, ".") == key.ZoneName {
+				var customDNSSECKey *common.DNSKey
+				var tsigKeyIDs []string
+				for _, key := range DNSKeys {
+					if strings.TrimSuffix(zoneName, ".") == key.Name {
 						customDNSSECKey = &key
+					}
+					if key.Type == common.TSIGKeyType {
+						tsigKeyIDs = append(tsigKeyIDs, key.Name)
 					}
 				}
 
 				zone := &powerdns.Zone{
-					Name:        &zoneName,
-					Kind:        powerdns.ZoneKindPtr(powerdns.MasterZoneKind),
-					DNSsec:      powerdns.Bool(customDNSSECKey == nil),
-					Nameservers: nameserverFQDNs,
-					RRsets:      rrSets,
+					Name:             &zoneName,
+					Kind:             powerdns.ZoneKindPtr(powerdns.MasterZoneKind),
+					DNSsec:           powerdns.Bool(customDNSSECKey == nil),
+					Nameservers:      nameserverFQDNs,
+					RRsets:           rrSets,
+					MasterTSIGKeyIDs: tsigKeyIDs,
 				}
 
 				masterZone, err = pdns.Zones.Add(zone)
@@ -153,7 +158,6 @@ func trueUpReverseZones(networks []sls_common.Network,
 				}
 			}
 
-
 			var reverseZone *powerdns.Zone
 			reverseZone, err = pdns.Zones.Get(reverseZoneName)
 			if err == nil {
@@ -166,19 +170,24 @@ func trueUpReverseZones(networks []sls_common.Network,
 					return
 				} else {
 					if pdnsErr.StatusCode == http.StatusNotFound {
-						// Figure out if this zone has a custom DNSSEC key.
-						var customDNSSECKey *common.DNSSECKey
-						for _, key := range DNSSecKeys {
-							if strings.TrimSuffix(reverseZoneName, ".") == key.ZoneName {
+						// Figure out if this zone has any custom keys.
+						var customDNSSECKey *common.DNSKey
+						var tsigKeyIDs []string
+						for _, key := range DNSKeys {
+							if strings.TrimSuffix(reverseZoneName, ".") == key.Name {
 								customDNSSECKey = &key
+							}
+							if key.Type == common.TSIGKeyType {
+								tsigKeyIDs = append(tsigKeyIDs, key.Name)
 							}
 						}
 
 						reverseZone = &powerdns.Zone{
-							Name:        &reverseZoneName,
-							Kind:        powerdns.ZoneKindPtr(powerdns.MasterZoneKind),
-							DNSsec:      powerdns.Bool(true),
-							Nameservers: nameserverFQDNs,
+							Name:             &reverseZoneName,
+							Kind:             powerdns.ZoneKindPtr(powerdns.MasterZoneKind),
+							DNSsec:           powerdns.Bool(true),
+							Nameservers:      nameserverFQDNs,
+							MasterTSIGKeyIDs: tsigKeyIDs,
 						}
 						reverseZone, err = pdns.Zones.Add(reverseZone)
 						if err != nil {
@@ -244,7 +253,7 @@ func buildStaticForwardRRSets(networks []sls_common.Network, hardware []sls_comm
 					// In this case we also have to create an additional RRset for the name which is the primary alias
 					// for the node...yea, still kooky.
 					nameRRset := powerdns.RRset{
-						Name:       powerdns.String(fmt.Sprintf("%s.%s.%s.",
+						Name: powerdns.String(fmt.Sprintf("%s.%s.%s.",
 							reservation.Name, networkDomain, *baseDomain)),
 						Type:       powerdns.RRTypePtr(powerdns.RRTypeCNAME),
 						TTL:        powerdns.Uint32(3600),
@@ -636,7 +645,6 @@ func trueUpDNS() {
 	logger.Info("Running true up loop at interval.", zap.Int("trueUpLoopInterval", *trueUpSleepInterval))
 
 	defer WaitGroup.Done()
-
 
 	var masterNameserver common.Nameserver
 	var slaveNameservers []common.Nameserver

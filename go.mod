@@ -37,5 +37,5 @@ require (
 	stash.us.cray.com/HMS/hms-smd v1.30.4
 )
 
-// Temporary until I can get a PR opened to the parent project for the CryptoKey support we need.
-replace github.com/joeig/go-powerdns/v2 => github.com/SeanWallace/go-powerdns/v2 v2.4.1-0.20210716030559-372444227cfb
+// Temporary until I can get a PR opened to the parent project for the CryptoKey and TSIGKey support we need.
+replace github.com/joeig/go-powerdns/v2 => github.com/SeanWallace/go-powerdns/v2 v2.4.1-0.20210914015402-5c6aa3160920

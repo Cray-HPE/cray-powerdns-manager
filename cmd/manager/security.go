@@ -1,18 +1,22 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/joeig/go-powerdns/v2"
 	"io/ioutil"
+	"net/http"
 	"stash.us.cray.com/CSM/cray-powerdns-manager/internal/common"
 	"strings"
 )
 
+const tsigExtension = ".tsig"
+
 var (
-	DNSSecKeys []common.DNSSECKey
+	DNSKeys []common.DNSKey
 )
 
-func ParseDNSSecKeys() error {
+func ParseDNSKeys() error {
 	if *keyDirectory == "" {
 		return fmt.Errorf("blank key directory")
 	}
@@ -32,25 +36,77 @@ func ParseDNSSecKeys() error {
 			return fmt.Errorf("failed to read key file: %w", err)
 		}
 
-		DNSSecKeys = append(DNSSecKeys, common.DNSSECKey{
-			ZoneName:   privateKeyFile.Name(),
-			PrivateKey: string(privateKeyData),
+		var keyType common.DNSKeyType
+		keyName := privateKeyFile.Name()
+
+		// Intuit the type from the name. If it has a .tsig extension, assume it to be so.
+		if strings.HasSuffix(privateKeyFile.Name(), tsigExtension) {
+			keyType = common.TSIGKeyType
+
+			// Whack off this extension for use everywhere else.
+			keyName = strings.TrimSuffix(keyName, tsigExtension)
+		} else {
+			keyType = common.DNSSecKeyType
+		}
+
+		DNSKeys = append(DNSKeys, common.DNSKey{
+			Name: keyName,
+			Data: string(privateKeyData),
+			Type: keyType,
 		})
 	}
 
 	return nil
 }
 
-func AddCryptokeyToZone(key common.DNSSECKey) error {
+func AddCryptokeyToZone(key common.DNSKey) error {
 	newCryptokey := powerdns.Cryptokey{
 		KeyType:    powerdns.String("csk"),
 		Active:     powerdns.Bool(true),
-		Privatekey: powerdns.String(key.PrivateKey),
+		Privatekey: powerdns.String(key.Data),
 	}
 
-	_, err := pdns.Cryptokeys.Add(key.ZoneName, &newCryptokey)
+	_, err := pdns.Cryptokeys.Add(key.Name, &newCryptokey)
 	if err != nil {
 		return fmt.Errorf("failed to add cryptokey to zone: %w", err)
+	}
+
+	return nil
+}
+
+func AddOrUpdateTSIGKey(key common.DNSKey) error {
+	var existingTSIGKey *powerdns.TSIGKey
+	var newTSIGKey *powerdns.TSIGKey
+	var err error
+
+	// The data in the DNSKey is actually a JSON block that if the user did as instructed can be natively unmarshalled
+	// into the PowerDNS struct.
+	jsonErr := json.Unmarshal([]byte(key.Data), &newTSIGKey)
+	if jsonErr != nil {
+		return fmt.Errorf("failed to unmarshal TSIG key: %w", jsonErr)
+	}
+
+	// Get any existing key by this name.
+	existingTSIGKey, err = pdns.TSIGKeys.Get(key.Name)
+	if err != nil {
+		pdnsErr := err.(*powerdns.Error)
+		if pdnsErr.StatusCode != http.StatusNotFound {
+			return fmt.Errorf("failed to perform TSIG key lookup: %w", err)
+		}
+	}
+
+	// At this point the key either has a value in the structure or it's nil. Check if we need to add or update.
+	var addOrUpdateErr error
+	if existingTSIGKey.Key != nil {
+		if *existingTSIGKey.Key != *newTSIGKey.Key {
+			_, addOrUpdateErr = pdns.TSIGKeys.Replace(key.Name, newTSIGKey)
+		}
+	} else {
+		_, addOrUpdateErr = pdns.TSIGKeys.Add(newTSIGKey)
+	}
+
+	if addOrUpdateErr != nil {
+		return fmt.Errorf("failed to add TSIG key: %w", addOrUpdateErr)
 	}
 
 	return nil

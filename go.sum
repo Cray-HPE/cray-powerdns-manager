@@ -48,8 +48,14 @@ github.com/Microsoft/go-winio v0.4.11/go.mod h1:VhR8bwka0BXejwEJY73c50VrPtXAaKcy
 github.com/Microsoft/go-winio v0.4.14/go.mod h1:qXqCSQ3Xa7+6tgxaGTIe4Kpcdsi+P8jBhyzoq1bpyYA=
 github.com/Microsoft/go-winio v0.4.15-0.20190919025122-fc70bd9a86b5/go.mod h1:tTuCMEN+UleMWgg9dVx4Hu52b1bJo+59jBh3ajtinzw=
 github.com/Microsoft/hcsshim v0.8.9/go.mod h1:5692vkUqntj1idxauYlpoINNKeqCiG6Sg38RRsjT5y8=
-github.com/SeanWallace/go-powerdns/v2 v2.4.1-0.20210716030559-372444227cfb h1:9K/29mZ95LtK8FmN+3kep3dS3bLrGmKasPyFqJcr/KI=
-github.com/SeanWallace/go-powerdns/v2 v2.4.1-0.20210716030559-372444227cfb/go.mod h1:VgLq0WK8knYT+c6RcD5dB/L3LUvUXHNnGZp/nmSwJBk=
+github.com/SeanWallace/go-powerdns/v2 v2.4.1-0.20210914011236-23ae210a6f39 h1:Rf3mNVNGBDQj7TwmzsTuDc+QDacR9mofEFqdBSJjg20=
+github.com/SeanWallace/go-powerdns/v2 v2.4.1-0.20210914011236-23ae210a6f39/go.mod h1:VgLq0WK8knYT+c6RcD5dB/L3LUvUXHNnGZp/nmSwJBk=
+github.com/SeanWallace/go-powerdns/v2 v2.4.1-0.20210914012242-c292545f2672 h1:/PXoAtHgvii8f2DKUDGq0f0EwD1KWbkmZDBGbBCqQ34=
+github.com/SeanWallace/go-powerdns/v2 v2.4.1-0.20210914012242-c292545f2672/go.mod h1:VgLq0WK8knYT+c6RcD5dB/L3LUvUXHNnGZp/nmSwJBk=
+github.com/SeanWallace/go-powerdns/v2 v2.4.1-0.20210914012933-b809957b7454 h1:o7cj9mo4obVtTqoaQICF/nr4NcnE5lwO6+WPTG4UAQ8=
+github.com/SeanWallace/go-powerdns/v2 v2.4.1-0.20210914012933-b809957b7454/go.mod h1:VgLq0WK8knYT+c6RcD5dB/L3LUvUXHNnGZp/nmSwJBk=
+github.com/SeanWallace/go-powerdns/v2 v2.4.1-0.20210914015402-5c6aa3160920 h1:ABO88dctQV8aioJnt72I8+GgTfxxmA6PRi5m2ztd27k=
+github.com/SeanWallace/go-powerdns/v2 v2.4.1-0.20210914015402-5c6aa3160920/go.mod h1:VgLq0WK8knYT+c6RcD5dB/L3LUvUXHNnGZp/nmSwJBk=
 github.com/Shopify/sarama v1.19.0/go.mod h1:FVkBWblsNy7DGZRfXLU0O9RCGt5g3g3yEuWXgklEdEo=
 github.com/Shopify/sarama v1.22.1/go.mod h1:FRzlvRpMFO/639zY1SDxUxkqH97Y0ndM5CbGj6oG3As=
 github.com/Shopify/toxiproxy v2.1.4+incompatible/go.mod h1:OXgGpZ6Cli1/URJOF1DMxUHB2q5Ap20/P/eIdh4G0pI=

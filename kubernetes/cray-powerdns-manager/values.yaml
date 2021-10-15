@@ -11,7 +11,7 @@ cray-service:
     cray-powerdns-manager:
       name: "cray-powerdns-manager"
       image:
-        repository: "cray/cray-powerdns-manager"
+        repository: "artifactory.algol60.net/csm-docker/stable/cray-powerdns-manager"
         pullPolicy: Always
       ports:
         - name:          http

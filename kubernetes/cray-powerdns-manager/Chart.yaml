@@ -1,14 +1,19 @@
 apiVersion: v2
 name: cray-powerdns-manager
-version: 0.4.0
+version: 0.5.0
 description: Kubernetes Deployment for PowerDNS Manager
 keywords:
   - cray-powerdns-manager
 home: https://github.com/Cray-HPE/cray-powerdns-manager
 dependencies:
   - name: cray-service
-    version: "~2.8.0"
-    repository: "@cray-algol60"
+    version: "~7.0.0"
+    repository: "https://artifactory.algol60.net/artifactory/csm-helm-charts/"
+maintainers:
+  - name: dle-hpe
+  - name: SeanWallace
+  - name: spillerc-hpe
+appVersion: 0.4.0
 annotations:
   artifacthub.io/changes: |
     - kind: security

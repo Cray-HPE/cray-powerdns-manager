@@ -1,27 +1,53 @@
 NAME ?= cray-powerdns-manager
-CHART_PATH ?= kubernetes
 VERSION ?= $(shell cat .version)-local
-CHART_VERSION ?= $(VERSION)
 
-HELM_UNITTEST_IMAGE ?= quintush/helm-unittest:3.3.0-0.2.5
+CHARTDIR ?= kubernetes
+
+YQ_IMAGE ?= artifactory.algol60.net/docker.io/mikefarah/yq:4
+HELM_UNITTEST_IMAGE ?= artifactory.algol60.net/docker.io/quintush/helm-unittest
+
+# Get image repository
+IMAGE_REPOSITORY ?= $(shell docker run --rm -i ${YQ_IMAGE} e '.cray-service.containers.${NAME}.image.repository' - < ${CHARTDIR}/${NAME}/values.yaml)
+
+# Define chart annotations
+define ANNOTATION_IMAGES
+- name: ${NAME}
+  image: ${IMAGE_REPOSITORY}:${VERSION}
+endef
+export ANNOTATION_IMAGES
 
 all : image chart
-chart: chart_setup chart_package chart_test
+chart: chart_metadata chart_package chart_test
+
+.PHONY: image chart_metadata chart_test clean
 
 image:
 	docker build --pull ${DOCKER_ARGS} --tag '${NAME}:${VERSION}' .
 
-chart_setup:
-	mkdir -p ${CHART_PATH}/.packaged
-	docker run --rm -v ${PWD}:/apps artifactory.algol60.net/docker.io/library/bash bash -c 'wget https://github.com/mikefarah/yq/releases/download/v4.14.2/yq_linux_amd64 -O /usr/bin/yq && chmod +x /usr/bin/yq && /apps/hack/update-chart-globals.sh /apps/${CHART_PATH}/${NAME}'
+chart_metadata:
+	docker run --rm -v ${PWD}/${CHARTDIR}/${NAME}:/chart ${YQ_IMAGE} e -Pi ".version = \"${VERSION}\", .appVersion = \"${VERSION}\", .annotations.\"artifacthub.io/images\" = \"$${ANNOTATION_IMAGES}\"" /chart/Chart.yaml
+	docker run --rm -v ${PWD}/${CHARTDIR}/${NAME}:/chart ${YQ_IMAGE} e -Pi '.global.chart.name = "${NAME}", .global.chart.version = "${VERSION}", .global.appVersion = "${VERSION}"' /chart/values.yaml
 
-chart_package:
-	helm dep up ${CHART_PATH}/${NAME}
-	helm package ${CHART_PATH}/${NAME} -d ${CHART_PATH}/.packaged --app-version ${VERSION} --version ${CHART_VERSION}
+chart_package: ${CHARTDIR}/.packaged/${NAME}-${VERSION}.tgz
 
 chart_test:
-	helm lint "${CHART_PATH}/${NAME}"
-	docker run --rm -v ${PWD}/${CHART_PATH}:/apps ${HELM_UNITTEST_IMAGE} -3 ${NAME}
+	helm lint ${CHARTDIR}/${NAME}
+	docker run --rm -v ${PWD}/${CHARTDIR}:/apps ${HELM_UNITTEST_IMAGE} -3 ${NAME}
 
 clean:
-	$(RM) -r ${CHART_PATH}/.packaged
+	$(RM) -r ${CHARTDIR}/.packaged
+
+${CHARTDIR}/.packaged/${NAME}-${VERSION}.tgz: ${CHARTDIR}/.packaged
+	helm dep up ${CHARTDIR}/${NAME}
+	helm package ${CHARTDIR}/${NAME} -d ${CHARTDIR}/.packaged --app-version ${VERSION} --version ${VERSION}
+
+${CHARTDIR}/.packaged:
+	mkdir -p ${CHARTDIR}/.packaged
+
+chart_images: ${CHARTDIR}/.packaged/${NAME}-${VERSION}.tgz
+	@{ \
+	  helm template release $< --dry-run --replace --dependency-update --set manager.base_domain=example.com; \
+	  echo '---' ; \
+	  helm show chart $< | docker run --rm -i artifactory.algol60.net/docker.io/mikefarah/yq:4 e -N '.annotations."artifacthub.io/images"' - ; \
+	} | docker run --rm -i artifactory.algol60.net/docker.io/mikefarah/yq:4 e -N '.. | .image? | select(.)' - | sort -u
+

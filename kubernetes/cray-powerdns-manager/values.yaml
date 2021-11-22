@@ -1,20 +1,20 @@
 cray-service:
-  type:               "Deployment"
-  nameOverride:       "cray-powerdns-manager"
-  fullnameOverride:   "cray-powerdns-manager"
-  priorityClassName:  "csm-high-priority-service"
+  type: "Deployment"
+  nameOverride: "cray-powerdns-manager"
+  fullnameOverride: "cray-powerdns-manager"
+  priorityClassName: "csm-high-priority-service"
   serviceAccountName: "jobs-watcher"
-  replicaCount:       1
+  replicaCount: 1
   strategy:
     type: Recreate
   containers:
     cray-powerdns-manager:
       name: "cray-powerdns-manager"
       image:
-        repository: "cray/cray-powerdns-manager"
+        repository: "artifactory.algol60.net/csm-docker/stable/cray-powerdns-manager"
         pullPolicy: Always
       ports:
-        - name:          http
+        - name: http
           containerPort: 8080
       env:
         - name: BASE_DOMAIN
@@ -26,24 +26,24 @@ cray-service:
           valueFrom:
             configMapKeyRef:
               name: cray-powerdns-manager-config
-              key:  primary_server
+              key: primary_server
         - name: SECONDARY_SERVERS
           valueFrom:
             configMapKeyRef:
               name: cray-powerdns-manager-config
-              key:  secondary_servers
+              key: secondary_servers
         - name: NOTIFY_ZONES
           valueFrom:
             configMapKeyRef:
               name: cray-powerdns-manager-config
-              key:  notify_zones
-        - name:  PDNS_URL
+              key: notify_zones
+        - name: PDNS_URL
           value: "http://cray-dns-powerdns-api:8081"
         - name: PDNS_API_KEY
           valueFrom:
             secretKeyRef:
               name: cray-powerdns-credentials
-              key:  pdns_api_key
+              key: pdns_api_key
         - name: KEY_DIRECTORY
           value: "/keys"
       livenessProbe:
@@ -51,23 +51,27 @@ cray-service:
           port: 8080
           path: /v1/liveness
         initialDelaySeconds: 10
-        periodSeconds:       30
+        periodSeconds: 30
       readinessProbe:
         httpGet:
           port: 8080
           path: /v1/readiness
         initialDelaySeconds: 15
-        periodSeconds:       30
+        periodSeconds: 30
       volumeMounts:
         - name: dnssec-keys
           mountPath: "/keys"
           readOnly: true
   ingress:
     enabled: true
-    prefix:  "/apis/powerdns-manager/"
-    uri:     "/"
-
+    prefix: "/apis/powerdns-manager/"
+    uri: "/"
 manager:
   primary_server: ""
   secondary_servers: ""
   notify_zones: ""
+global:
+  appVersion: "0.5.0"
+  chart:
+    name: "cray-powerdns-manager"
+    version: "0.5.0"

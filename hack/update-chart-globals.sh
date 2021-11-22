@@ -7,7 +7,7 @@ set -o pipefail
 
 ROOTDIR="$(dirname "${BASH_SOURCE[0]}")/.."
 
-[[ $# -eq 0 ]] && set -- kubernetes/*
+[[ $# -eq 0 ]] && set -- ${ROOTDIR}/kubernetes/*
 
 declare -a charts=()
 

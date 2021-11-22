@@ -5,6 +5,10 @@
 set -o errexit
 set -o pipefail
 
+ROOTDIR="$(dirname "${BASH_SOURCE[0]}")/.."
+
+[[ $# -eq 0 ]] && set -- kubernetes/*
+
 declare -a charts=()
 
 while [[ $# -gt 0 ]]; do

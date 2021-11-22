@@ -71,7 +71,7 @@ manager:
   secondary_servers: ""
   notify_zones: ""
 global:
-  appVersion: "0.4.0"
+  appVersion: "0.5.0"
   chart:
     name: "cray-powerdns-manager"
     version: "0.5.0"

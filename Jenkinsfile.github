@@ -29,6 +29,9 @@ pipeline {
                 }
 
                 stage('Chart') {
+                    environment {
+                        IMAGE = "artifactory.algol60.net/csm-docker/${env.IS_STABLE ? "stable" : "unstable"}/${env.NAME}"
+                    }
                     steps {
                         sh "make chart"
                     }

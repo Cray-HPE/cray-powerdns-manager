@@ -65,7 +65,7 @@ chart-images: ${CHARTDIR}/.packaged/${NAME}-${CHART_VERSION}.tgz
 	} | docker run --rm -i $(YQ_IMAGE) e -N '.. | .image? | select(.)' - | sort -u
 
 snyk:
-	$(MAKE) -s chart-images | xargs -n 1 snyk container test
+	$(MAKE) -s chart-images | xargs --verbose -n 1 snyk container test
 
 chart-gen-docs:
 	docker run --rm \

@@ -47,10 +47,6 @@ helm:
 
 chart-package: ${CHARTDIR}/.packaged/${NAME}-${CHART_VERSION}.tgz
 
-chart-test:
-	CMD="lint ${CHARTDIR}/${NAME}" $(MAKE) helm
-	docker run --rm -v ${PWD}/${CHARTDIR}:/apps ${HELM_UNITTEST_IMAGE} -3 ${NAME}
-
 ${CHARTDIR}/.packaged/${NAME}-${CHART_VERSION}.tgz: ${CHARTDIR}/.packaged
 	CMD="dep up ${CHARTDIR}/${NAME}" $(MAKE) helm
 	CMD="package ${CHARTDIR}/${NAME} -d ${CHARTDIR}/.packaged" $(MAKE) helm
@@ -58,14 +54,18 @@ ${CHARTDIR}/.packaged/${NAME}-${CHART_VERSION}.tgz: ${CHARTDIR}/.packaged
 ${CHARTDIR}/.packaged:
 	mkdir -p ${CHARTDIR}/.packaged
 
-clean:
-	$(RM) -r ${CHARTDIR}/.packaged .helm
+chart-test:
+	CMD="lint ${CHARTDIR}/${NAME}" $(MAKE) helm
+	docker run --rm -v ${PWD}/${CHARTDIR}:/apps ${HELM_UNITTEST_IMAGE} -3 ${NAME}
 
 chart-images: ${CHARTDIR}/.packaged/${NAME}-${CHART_VERSION}.tgz
-	{ CMD="template release $< --dry-run --replace --dependency-update --set manager.base_domain=example.com" $(MAKE) -s helm; \
+	{ CMD="template release $< --dry-run --replace --dependency-update" $(MAKE) -s helm; \
 	  echo '---' ; \
 	  CMD="show chart $<" $(MAKE) -s helm | docker run --rm -i $(YQ_IMAGE) e -N '.annotations."artifacthub.io/images"' - ; \
 	} | docker run --rm -i $(YQ_IMAGE) e -N '.. | .image? | select(.)' - | sort -u
+
+snyk:
+	$(MAKE) -s chart-images | xargs -n 1 snyk container test
 
 chart-gen-docs:
 	docker run --rm \
@@ -74,3 +74,6 @@ chart-gen-docs:
 	    -w /src \
 	    $(HELM_DOCS_IMAGE) \
 	    helm-docs --chart-search-root=$(CHARTDIR)
+
+clean:
+	$(RM) -r ${CHARTDIR}/.packaged .helm

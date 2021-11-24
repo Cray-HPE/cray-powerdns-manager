@@ -1,0 +1,19 @@
+name: Lint, test, and scan Helm charts
+on:
+  pull_request:
+    branches:
+      - master
+      - release/**
+  schedule:
+    - cron: '33 19 * * *'
+  workflow_dispatch:
+jobs:
+  lint-test-scan:
+    uses: Cray-HPE/.github/.github/workflows/charts-lint-test-scan.yml@main
+    with:
+      lint-charts: ${{ github.event_name == 'pull_request' }}
+      test-charts: false
+      scan-chart-snyk-args: "--severity-threshold=high --policy-path=kubernetes/.snyk"
+      #scan-image-snyk-args: "--severity-threshold=high"
+    secrets:
+      snyk-token: ${{ secrets.SNYK_TOKEN }}

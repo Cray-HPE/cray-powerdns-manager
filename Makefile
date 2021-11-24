@@ -59,7 +59,7 @@ chart-test:
 	docker run --rm -v ${PWD}/${CHARTDIR}:/apps ${HELM_UNITTEST_IMAGE} -3 ${NAME}
 
 chart-images: ${CHARTDIR}/.packaged/${NAME}-${CHART_VERSION}.tgz
-	{ CMD="template release $< --dry-run --replace --dependency-update" $(MAKE) -s helm; \
+	{ CMD="template release $< --dry-run --replace --dependency-update --set manager.base_domain=example.com" $(MAKE) -s helm; \
 	  echo '---' ; \
 	  CMD="show chart $<" $(MAKE) -s helm | docker run --rm -i $(YQ_IMAGE) e -N '.annotations."artifacthub.io/images"' - ; \
 	} | docker run --rm -i $(YQ_IMAGE) e -N '.. | .image? | select(.)' - | sort -u

@@ -1,6 +1,6 @@
 apiVersion: v2
 name: cray-powerdns-manager
-version: 0.5.2
+version: 0.5.3
 description: Synchronizes all DNS records for Cray EX systems
 keywords:
   - cray-powerdns-manager
@@ -13,7 +13,7 @@ maintainers:
   - name: dle-hpe
   - name: SeanWallace
   - name: spillerc-hpe
-appVersion: 0.5.2
+appVersion: 0.5.3
 annotations:
   artifacthub.io/changes: |
     - kind: security
@@ -25,5 +25,5 @@ annotations:
           url: https://github.com/Cray-HPE/cray-powerdns-manager/pull/10
   artifacthub.io/images: |
     - name: cray-powerdns-manager
-      image: artifactory.algol60.net/csm-docker/stable/cray-powerdns-manager:0.5.2
+      image: artifactory.algol60.net/csm-docker/stable/cray-powerdns-manager:0.5.3
   artifacthub.io/license: MIT

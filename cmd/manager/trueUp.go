@@ -2,16 +2,17 @@ package main
 
 import (
 	"fmt"
+	"net"
+	"net/http"
+	"strings"
+	"time"
+
 	"github.com/joeig/go-powerdns/v2"
 	"github.com/mitchellh/mapstructure"
 	"go.uber.org/zap"
-	"net"
-	"net/http"
 	"stash.us.cray.com/CSM/cray-powerdns-manager/internal/common"
 	sls_common "stash.us.cray.com/HMS/hms-sls/pkg/sls-common"
 	"stash.us.cray.com/HMS/hms-smd/pkg/sm"
-	"strings"
-	"time"
 )
 
 func ensureMasterZone(zoneName string, nameserverFQDNs []string, rrSets []powerdns.RRset) (masterZone *powerdns.Zone) {
@@ -139,8 +140,9 @@ func trueUpReverseZones(networks []sls_common.Network,
 				return
 			}
 
-			cidrParts := strings.Split(cidr.IP.String(), ".")
-			reverseZoneName := common.GetReverseName(cidrParts)
+			reverseZoneName := common.GetReverseZoneName(cidr)
+			logger.Debug("Calculated reverse zone name:", zap.Any("sls_network", network.Name),
+				zap.Any("cidr", cidr), zap.Any("reverseZoneName", reverseZoneName))
 
 			// This master name server is always listed as one of the nameservers.
 			masterNameserverRRSet := common.GetNameserverRRset(masterNameserver)

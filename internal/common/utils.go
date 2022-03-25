@@ -3,9 +3,11 @@ package common
 import (
 	"fmt"
 	"github.com/joeig/go-powerdns/v2"
+	"net"
 	"reflect"
 	"sort"
 	sls_common "stash.us.cray.com/HMS/hms-sls/pkg/sls-common"
+	"strconv"
 	"strings"
 )
 
@@ -17,16 +19,34 @@ func MakeDomainCanonical(domain string) string {
 	}
 }
 
+// GetReverseZoneName computes a reverse zone name from a slice of IPv4 parts.
+func GetReverseZoneName(cidr *net.IPNet) string {
+	var reverseCIDR []string
+	var cidrParts []string
+
+	prefix, _ := strconv.Atoi(strings.Split(cidr.String(), "/")[1])
+
+	if prefix >= 24 {
+		cidrParts = strings.Split(cidr.IP.String(), ".")[0:3]
+	} else if prefix < 24 && prefix >= 16 {
+		cidrParts = strings.Split(cidr.IP.String(), ".")[0:2]
+	} else if prefix < 16 {
+		cidrParts = strings.Split(cidr.IP.String(), ".")[0:1]
+	}
+
+	for i := len(cidrParts) - 1; i >= 0; i-- {
+		reverseCIDR = append(reverseCIDR, cidrParts[i])
+	}
+
+	return fmt.Sprintf("%s%s", strings.Join(reverseCIDR, "."), ".in-addr.arpa")
+}
+
 // GetReverseName computes a reverse name from a slice of IPv4 parts.
 func GetReverseName(cidrParts []string) string {
 	var reverseCIDR []string
 
 	for i := len(cidrParts) - 1; i >= 0; i-- {
-		part := cidrParts[i]
-
-		if part != "0" {
-			reverseCIDR = append(reverseCIDR, cidrParts[i])
-		}
+		reverseCIDR = append(reverseCIDR, cidrParts[i])
 	}
 
 	return fmt.Sprintf("%s%s", strings.Join(reverseCIDR, "."), rdnsDomain)

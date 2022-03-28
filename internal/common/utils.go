@@ -38,7 +38,7 @@ func GetReverseZoneName(cidr *net.IPNet) string {
 		reverseCIDR = append(reverseCIDR, cidrParts[i])
 	}
 
-	return fmt.Sprintf("%s%s", strings.Join(reverseCIDR, "."), ".in-addr.arpa")
+	return fmt.Sprintf("%s%s", strings.Join(reverseCIDR, "."), rdnsDomain)
 }
 
 // GetReverseName computes a reverse name from a slice of IPv4 parts.

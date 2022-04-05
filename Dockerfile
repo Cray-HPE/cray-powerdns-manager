@@ -53,7 +53,7 @@ RUN set -ex \
     && go build ${go_build_args} -v -o /usr/local/bin/cray-powerdns-visualizer ./cmd/visualizer
 
 ## Final Stage ###
-FROM artifactory.algol60.net/docker.io/library/alpine
+FROM artifactory.algol60.net/csm-docker/stable/docker.io/library/alpine:3
 LABEL maintainer="Cray, Inc."
 
 COPY --from=builder /usr/local/bin/cray-powerdns-manager /usr/local/bin

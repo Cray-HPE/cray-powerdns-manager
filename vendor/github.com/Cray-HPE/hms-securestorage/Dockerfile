@@ -1,7 +1,6 @@
-#
 # MIT License
 #
-# (C) Copyright 2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright [2019-2021] Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -20,33 +19,27 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-apiVersion: v2
-name: cray-powerdns-manager
-version: 0.6.5
-description: Synchronizes all DNS records for Cray EX systems
-keywords:
-  - cray-powerdns-manager
-home: https://github.com/Cray-HPE/cray-powerdns-manager
-dependencies:
-  - name: cray-service
-    version: ~7.0.0
-    repository: https://artifactory.algol60.net/artifactory/csm-helm-charts/
-maintainers:
-  - name: dle-hpe
-  - name: SeanWallace
-  - name: spillerc-hpe
-appVersion: 0.6.5
-annotations:
-  artifacthub.io/changes: |
-    - kind: security
-      description: Refactor to use patched CSM images
-      links:
-        - name: Github Issue
-          url: https://github.com/Cray-HPE/cray-powerdns-manager/issues/11
-        - name: Github PR
-          url: https://github.com/Cray-HPE/cray-powerdns-manager/pull/10
-  artifacthub.io/images: |
-    - name: cray-powerdns-manager
-      image: artifactory.algol60.net/csm-docker/stable/cray-powerdns-manager:0.6.5
-  artifacthub.io/license: MIT
+
+# Dockerfile for building HMS securestorage code. Note that this
+# image can't be run as these are just packages in this repo.
+
+# Build base just has the packages installed we need.
+FROM arti.dev.cray.com/baseos-docker-master-local/golang:1.16-alpine3.13 AS build-base
+
+RUN set -ex \
+    && apk update \
+    && apk add build-base
+
+# Copy the files in for the next stages to use.
+FROM build-base AS base
+
+RUN go env -w GO111MODULE=auto
+
+COPY *.go $GOPATH/src/github.com/Cray-HPE/hms-securestorage/
+COPY vendor $GOPATH/src/github.com/Cray-HPE/hms-securestorage/vendor
+
+# Now we can build.
+FROM base
+
+RUN set -ex \
+    && go build -v github.com/Cray-HPE/hms-securestorage/...

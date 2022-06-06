@@ -10,9 +10,9 @@ import (
 	"github.com/joeig/go-powerdns/v2"
 	"github.com/mitchellh/mapstructure"
 	"go.uber.org/zap"
-	"stash.us.cray.com/CSM/cray-powerdns-manager/internal/common"
-	sls_common "stash.us.cray.com/HMS/hms-sls/pkg/sls-common"
-	"stash.us.cray.com/HMS/hms-smd/pkg/sm"
+	"github.com/Cray-HPE/cray-powerdns-manager/internal/common"
+	sls_common "github.com/Cray-HPE/hms-sls/pkg/sls-common"
+	"github.com/Cray-HPE/hms-smd/pkg/sm"
 )
 
 func ensureMasterZone(zoneName string, nameserverFQDNs []string, rrSets []powerdns.RRset) (masterZone *powerdns.Zone) {

@@ -6,7 +6,7 @@ import (
 	"github.com/joeig/go-powerdns/v2"
 	"io/ioutil"
 	"net/http"
-	"stash.us.cray.com/CSM/cray-powerdns-manager/internal/common"
+	"github.com/Cray-HPE/cray-powerdns-manager/internal/common"
 	"strings"
 )
 

@@ -1,3 +1,18 @@
+# github.com/Cray-HPE/hms-base v1.15.0
+github.com/Cray-HPE/hms-base
+# github.com/Cray-HPE/hms-certs v1.3.2
+github.com/Cray-HPE/hms-certs/pkg/hms_certs
+# github.com/Cray-HPE/hms-securestorage v1.12.2
+github.com/Cray-HPE/hms-securestorage
+# github.com/Cray-HPE/hms-sls v1.19.0
+## explicit
+github.com/Cray-HPE/hms-sls/pkg/sls-common
+# github.com/Cray-HPE/hms-smd v1.30.9
+## explicit
+github.com/Cray-HPE/hms-smd/pkg/redfish
+github.com/Cray-HPE/hms-smd/pkg/sm
+# github.com/Cray-HPE/hms-xname v1.0.1
+github.com/Cray-HPE/hms-xname/xnametypes
 # github.com/cenkalti/backoff/v3 v3.2.2
 ## explicit
 github.com/cenkalti/backoff/v3
@@ -93,7 +108,6 @@ github.com/pierrec/lz4/internal/xxh32
 # github.com/ryanuber/go-glob v1.0.0
 github.com/ryanuber/go-glob
 # github.com/sirupsen/logrus v1.8.1
-## explicit
 github.com/sirupsen/logrus
 # github.com/ugorji/go v1.2.6
 ## explicit
@@ -184,17 +198,4 @@ gopkg.in/square/go-jose.v2/jwt
 # gopkg.in/yaml.v2 v2.4.0
 ## explicit
 gopkg.in/yaml.v2
-# stash.us.cray.com/HMS/hms-base v1.13.0
-stash.us.cray.com/HMS/hms-base
-# stash.us.cray.com/HMS/hms-certs v1.3.0
-stash.us.cray.com/HMS/hms-certs/pkg/hms_certs
-# stash.us.cray.com/HMS/hms-securestorage v1.12.0
-stash.us.cray.com/HMS/hms-securestorage
-# stash.us.cray.com/HMS/hms-sls v1.10.1
-## explicit
-stash.us.cray.com/HMS/hms-sls/pkg/sls-common
-# stash.us.cray.com/HMS/hms-smd v1.30.4
-## explicit
-stash.us.cray.com/HMS/hms-smd/pkg/redfish
-stash.us.cray.com/HMS/hms-smd/pkg/sm
 # github.com/joeig/go-powerdns/v2 => github.com/SeanWallace/go-powerdns/v2 v2.4.1-0.20210914015402-5c6aa3160920

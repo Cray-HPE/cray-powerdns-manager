@@ -1,8 +1,10 @@
-module stash.us.cray.com/CSM/cray-powerdns-manager
+module github.com/Cray-HPE/cray-powerdns-manager
 
 go 1.16
 
 require (
+	github.com/Cray-HPE/hms-sls v1.19.0
+	github.com/Cray-HPE/hms-smd v1.30.9
 	github.com/cenkalti/backoff/v3 v3.2.2 // indirect
 	github.com/gin-gonic/gin v1.7.2
 	github.com/go-playground/validator/v10 v10.7.0 // indirect
@@ -20,7 +22,6 @@ require (
 	github.com/mitchellh/mapstructure v1.4.1
 	github.com/namsral/flag v1.7.4-pre
 	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
-	github.com/sirupsen/logrus v1.8.1 // indirect
 	github.com/ugorji/go v1.2.6 // indirect
 	github.com/xlab/treeprint v1.1.0
 	go.uber.org/atomic v1.9.0 // indirect
@@ -33,8 +34,6 @@ require (
 	google.golang.org/protobuf v1.27.1 // indirect
 	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	stash.us.cray.com/HMS/hms-sls v1.10.1
-	stash.us.cray.com/HMS/hms-smd v1.30.4
 )
 
 // Temporary until I can get a PR opened to the parent project for the CryptoKey and TSIGKey support we need.

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/hashicorp/go-retryablehttp"
 	"io/ioutil"
-	"stash.us.cray.com/HMS/hms-smd/pkg/sm"
+	"github.com/Cray-HPE/hms-smd/pkg/sm"
 
 )
 

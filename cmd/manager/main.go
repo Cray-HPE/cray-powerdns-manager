@@ -233,6 +233,7 @@ func main() {
 	// Build a list of SLS networks to ignore.
 	if *ignoreSLSNetworks != "" {
 		ignoreSLSNetworksArray = strings.Split(*ignoreSLSNetworks, ",")
+		logger.Debug("Excluding the following SLS networks from zone generation", zap.Strings("ignoreSLSNetworksArray", ignoreSLSNetworksArray))
 	}
 
 	// Kick off the true up loop.

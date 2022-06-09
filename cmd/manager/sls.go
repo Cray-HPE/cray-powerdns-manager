@@ -142,6 +142,12 @@ func getSLSNetworks() (networks []sls_common.Network, err error) {
 		}
 
 		for _, subsetNetwork := range originalNetworks {
+			// Need to ignore the SLS BICAN network plus any others passed in on the command line.
+			for _, netToIgnore := range ignoreSLSNetworksArray {
+				if (subsetNetwork.Name == netToIgnore) {
+					ignoredNetworks[subsetNetwork.Name] = subsetNetwork
+				}
+			}
 			if strings.HasPrefix(subsetNetwork.Name, subsetString) {
 				// If this network is a subset of any other network it should be ignored.
 				ignoredNetworks[subsetNetwork.Name] = subsetNetwork

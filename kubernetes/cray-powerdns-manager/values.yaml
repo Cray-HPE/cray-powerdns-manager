@@ -96,5 +96,5 @@ manager:
 global:
   chart:
     name: cray-powerdns-manager
-    version: 0.6.5
-  appVersion: 0.6.5
+    version: 0.6.6
+  appVersion: 0.6.6

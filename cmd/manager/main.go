@@ -68,6 +68,9 @@ var (
 	trueUpSleepInterval = flag.Int("true_up_sleep_interval", 30,
 		"Time to sleep between true up runs")
 
+	ignoreSLSNetworks = flag.String("sls_ignore", "BICAN",
+		"Comma separated list of SLS networks to ignore, should always include BICAN")
+
 	router *gin.Engine
 
 	pdns *powerdns.Client
@@ -91,6 +94,7 @@ var (
 	token string
 
 	notifyZonesArray []string
+	ignoreSLSNetworksArray []string
 )
 
 func setupLogging() {
@@ -224,6 +228,11 @@ func main() {
 		logger.Info("Sending DNS NOTIFY for all zones")
 	} else {
 		logger.Info("Sending DNS NOTIFY for zones", zap.Strings("notifyZonesArray", notifyZonesArray))
+	}
+
+	// Build a list of SLS networks to ignore.
+	if *ignoreSLSNetworks != "" {
+		ignoreSLSNetworksArray = strings.Split(*ignoreSLSNetworks, ",")
 	}
 
 	// Kick off the true up loop.

@@ -364,7 +364,6 @@ func buildDynamicReverseRRSets(networks []sls_common.Network, ethernetInterfaces
 		}
 
 		var ip net.IP
-		//var cidr *net.IPNet
 		ip, _, err = net.ParseCIDR(fmt.Sprintf("%s/32", ethernetInterface.IPAddr))
 		if err != nil {
 			logger.Error("Failed to parse ethernet interface IP address!",

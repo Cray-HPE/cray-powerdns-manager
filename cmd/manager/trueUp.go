@@ -32,12 +32,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/joeig/go-powerdns/v2"
-	"github.com/mitchellh/mapstructure"
-	"go.uber.org/zap"
 	"github.com/Cray-HPE/cray-powerdns-manager/internal/common"
 	sls_common "github.com/Cray-HPE/hms-sls/pkg/sls-common"
 	"github.com/Cray-HPE/hms-smd/pkg/sm"
+	"github.com/joeig/go-powerdns/v2"
+	"github.com/mitchellh/mapstructure"
+	"go.uber.org/zap"
 )
 
 func ensureMasterZone(zoneName string, nameserverFQDNs []string, rrSets []powerdns.RRset) (masterZone *powerdns.Zone) {
@@ -153,6 +153,7 @@ func trueUpMasterZones(baseDomain string, networks []sls_common.Network,
 func trueUpReverseZones(networks []sls_common.Network,
 	masterNameserver common.Nameserver, slaveNameservers []common.Nameserver) (reverseZones []*powerdns.Zone,
 	err error) {
+networks:
 	for _, network := range networks {
 		for _, ipRange := range network.IPRanges {
 			var nameserverFQDNs []string
@@ -168,6 +169,18 @@ func trueUpReverseZones(networks []sls_common.Network,
 			reverseZoneName := common.GetReverseZoneName(cidr)
 			logger.Debug("Calculated reverse zone name:", zap.Any("sls_network", network.Name),
 				zap.Any("cidr", cidr), zap.Any("reverseZoneName", reverseZoneName))
+
+			/*
+				As reverse zones split on a /24 boundary it's possible for two SLS subnets to map to the same reverse
+				zone. For example a CAN of 10.101.5.128/26 and a CMN of 10.101.5.0/25 would map to the same
+				5.101.10.in-addr.arpa zone. This avoids adding the same zone to the reverseZones array twice
+			*/
+			for _, zone := range reverseZones {
+				if strings.Contains(*zone.Name, reverseZoneName) {
+					logger.Debug("Master zone already exists.", zap.String("reverseZoneName", reverseZoneName))
+					continue networks
+				}
+			}
 
 			// This master name server is always listed as one of the nameservers.
 			masterNameserverRRSet := common.GetNameserverRRset(masterNameserver)
@@ -340,30 +353,10 @@ func buildStaticForwardRRSets(networks []sls_common.Network, hardware []sls_comm
 	return
 }
 
-func buildDynamicReverseRRSets(networks []sls_common.Network, ethernetInterfaces []sm.CompEthInterface,
-	reverseZone *powerdns.Zone) (dynamicRRSets []powerdns.RRset,
-	err error) {
-	var forwardCIDRString string
-	forwardCIDRString, err = common.GetForwardCIDRStringForReverseZone(reverseZone)
-	if err != nil {
-		return
-	}
+func buildDynamicReverseRRSets(networks []sls_common.Network, ethernetInterfaces []sm.CompEthInterface) (dynamicRRSets []powerdns.RRset, err error) {
 
-	// Find the SLS network associated with this reverse zone so we know what the full CIDR is.
-	network, ipRange := common.GetNetworkForCIDRString(networks, forwardCIDRString)
-	if network == nil || ipRange == nil {
-		err = fmt.Errorf("reverse zone does not have associated SLS network or IP range in network")
-		return
-	}
-
-	// Compute an IPNet object so we can use use the library functions to figure out if subsequent IPs fit inside it.
-	_, forwardCIDR, err := net.ParseCIDR(*ipRange)
-	if err != nil {
-		return
-	}
-
-	networkDomain := strings.ToLower(network.Name)
-
+	// Loop round SMD ethernetInterfaces and then build a list of rrSets
+	// TODO: Update for SMD v2
 	for _, ethernetInterface := range ethernetInterfaces {
 		if ethernetInterface.IPAddr == "" || ethernetInterface.CompID == "" {
 			// Can't process entries that don't have an IP or component ID.
@@ -371,6 +364,7 @@ func buildDynamicReverseRRSets(networks []sls_common.Network, ethernetInterfaces
 		}
 
 		var ip net.IP
+		//var cidr *net.IPNet
 		ip, _, err = net.ParseCIDR(fmt.Sprintf("%s/32", ethernetInterface.IPAddr))
 		if err != nil {
 			logger.Error("Failed to parse ethernet interface IP address!",
@@ -378,26 +372,59 @@ func buildDynamicReverseRRSets(networks []sls_common.Network, ethernetInterfaces
 			continue
 		}
 
-		if forwardCIDR.Contains(ip) {
-			primaryName := fmt.Sprintf("%s.%s.%s.", ethernetInterface.CompID, networkDomain, *baseDomain)
-			cidrParts := strings.Split(ip.String(), ".")
-
-			rrsetReverse := powerdns.RRset{
-				Name:       powerdns.String(common.MakeDomainCanonical(common.GetReverseName(cidrParts))),
-				Type:       powerdns.RRTypePtr(powerdns.RRTypePTR),
-				TTL:        powerdns.Uint32(3600),
-				ChangeType: powerdns.ChangeTypePtr(powerdns.ChangeTypeReplace),
-				Records: []powerdns.Record{
-					{
-						Content:  powerdns.String(primaryName),
-						Disabled: powerdns.Bool(false),
-					},
-				},
+		// Figure out what SLS network we're in
+		var exists bool = false
+		for _, network := range networks {
+			var networkProperties NetworkExtraProperties
+			err = mapstructure.Decode(network.ExtraPropertiesRaw, &networkProperties)
+			if err != nil {
+				return
 			}
-			dynamicRRSets = append(dynamicRRSets, rrsetReverse)
+			var forwardCIDR *net.IPNet
+			_, forwardCIDR, err = net.ParseCIDR(networkProperties.CIDR)
+			if err != nil {
+				return
+			}
+
+			networkDomain := strings.ToLower(network.Name)
+
+			if forwardCIDR.Contains(ip) {
+				exists = true
+				logger.Debug("buildDynamicReverseRRSets: Network membership found",
+					zap.Any("network", network.Name),
+					zap.Any("forwardCIDR", forwardCIDR), zap.Any("IP", ip))
+
+				reverseZoneName := common.GetReverseZoneName(forwardCIDR)
+				cidrParts := strings.Split(ip.String(), ".")
+
+				logger.Debug("buildDynamicReverseRRSets: Calculated reverse zone membership",
+					zap.Any("reverseZoneName", reverseZoneName),
+					zap.Any("reverseName", common.GetReverseName(cidrParts)))
+
+				primaryName := fmt.Sprintf("%s.%s.%s.", ethernetInterface.CompID, networkDomain, *baseDomain)
+
+				rrsetReverse := powerdns.RRset{
+					Name:       powerdns.String(common.MakeDomainCanonical(common.GetReverseName(cidrParts))),
+					Type:       powerdns.RRTypePtr(powerdns.RRTypePTR),
+					TTL:        powerdns.Uint32(3600),
+					ChangeType: powerdns.ChangeTypePtr(powerdns.ChangeTypeReplace),
+					Records: []powerdns.Record{
+						{
+							Content:  powerdns.String(primaryName),
+							Disabled: powerdns.Bool(false),
+						},
+					},
+				}
+
+				dynamicRRSets = append(dynamicRRSets, rrsetReverse)
+
+			}
+		}
+		if exists == false {
+			logger.Debug("buildDynamicReverseRRSets: ethernetInterfaces record does not belong to any SLS network",
+				zap.Any("ethernetInterfaces", ethernetInterface))
 		}
 	}
-
 	return
 }
 
@@ -416,6 +443,12 @@ func buildStaticReverseRRSets(networks []sls_common.Network,
 			if err != nil {
 				return
 			}
+
+			/*	Need to discount the last octet as on a system with small subnets multiple SLS networks could map to
+				the	same reverse zone. For example a CAN of 10.101.5.128/26 and a CMN of 10.101.5.0/25 would both map
+				to the same /24 reverse zone of 5.101.10.in-addr.arpa */
+			ip = ip.To4()
+			ip[3] = 0
 
 			if forwardCIDRString == ip.String() {
 				networkDomain := strings.ToLower(network.Name)
@@ -770,16 +803,13 @@ func trueUpDNS() {
 		if err != nil {
 			logger.Error("Failed to build dynamic RRsets!", zap.Error(err))
 		}
-		for _, reverseZone := range reverseZones {
-			dynamicRRSetsReverse, err := buildDynamicReverseRRSets(networks, ethernetInterfaces, reverseZone)
-			if err != nil {
-				logger.Error("Failed to build reverse zone RRsets!",
-					zap.Error(err), zap.Any("reverseZone", reverseZone))
-			}
 
-			// Add all these records to the final RR set.
-			finalRRSet = append(finalRRSet, dynamicRRSetsReverse...)
+		dynamicRRSetsReverse, err := buildDynamicReverseRRSets(networks, ethernetInterfaces)
+		if err != nil {
+			logger.Error("Failed to build reverse zone RRsets!",
+				zap.Error(err))
 		}
+		finalRRSet = append(finalRRSet, dynamicRRSetsReverse...)
 
 		// At this point we have computed every correct RRSet necessary. Now the only task is to add the ones that are
 		// missing and remove the ones that shouldn't be there.

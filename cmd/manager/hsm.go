@@ -28,14 +28,13 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/Cray-HPE/hms-smd/pkg/sm"
 	"github.com/hashicorp/go-retryablehttp"
 	"io/ioutil"
-	"github.com/Cray-HPE/hms-smd/pkg/sm"
-
 )
 
-func getHSMEthernetInterfaces() (ethernetInterfaces []sm.CompEthInterface, err error) {
-	url := fmt.Sprintf("%s/hsm/v1/Inventory/EthernetInterfaces", *hsmURL)
+func getHSMEthernetInterfaces() (ethernetInterfaces []sm.CompEthInterfaceV2, err error) {
+	url := fmt.Sprintf("%s/hsm/v2/Inventory/EthernetInterfaces", *hsmURL)
 	req, err := retryablehttp.NewRequest("GET", url, nil)
 	if err != nil {
 		err = fmt.Errorf("failed to create new request: %w", err)
@@ -44,7 +43,7 @@ func getHSMEthernetInterfaces() (ethernetInterfaces []sm.CompEthInterface, err e
 	if token != "" {
 		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
 	}
-	req	= req.WithContext(ctx)
+	req = req.WithContext(ctx)
 
 	resp, err := httpClient.Do(req)
 	if err != nil {

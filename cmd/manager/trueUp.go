@@ -353,75 +353,77 @@ func buildStaticForwardRRSets(networks []sls_common.Network, hardware []sls_comm
 	return
 }
 
-func buildDynamicReverseRRSets(networks []sls_common.Network, ethernetInterfaces []sm.CompEthInterface) (dynamicRRSets []powerdns.RRset, err error) {
+func buildDynamicReverseRRSets(networks []sls_common.Network, ethernetInterfaces []sm.CompEthInterfaceV2) (dynamicRRSets []powerdns.RRset, err error) {
 
 	// Loop round SMD ethernetInterfaces and then build a list of rrSets
-	// TODO: Update for SMD v2
 	for _, ethernetInterface := range ethernetInterfaces {
-		if ethernetInterface.IPAddr == "" || ethernetInterface.CompID == "" {
+		if len(ethernetInterface.IPAddrs) == 0 || ethernetInterface.CompID == "" {
 			// Can't process entries that don't have an IP or component ID.
 			continue
 		}
 
-		var ip net.IP
-		ip, _, err = net.ParseCIDR(fmt.Sprintf("%s/32", ethernetInterface.IPAddr))
-		if err != nil {
-			logger.Error("Failed to parse ethernet interface IP address!",
-				zap.Error(err), zap.Any("ethernetInterface", ethernetInterface))
-			continue
-		}
+		for _, ethernetIP := range ethernetInterface.IPAddrs {
 
-		// Figure out what SLS network we're in
-		var exists bool = false
-		for _, network := range networks {
-			var networkProperties NetworkExtraProperties
-			err = mapstructure.Decode(network.ExtraPropertiesRaw, &networkProperties)
+			var ip net.IP
+			ip, _, err = net.ParseCIDR(fmt.Sprintf("%s/32", ethernetIP.IPAddr))
 			if err != nil {
-				return
-			}
-			var forwardCIDR *net.IPNet
-			_, forwardCIDR, err = net.ParseCIDR(networkProperties.CIDR)
-			if err != nil {
-				return
+				logger.Debug("Failed to parse ethernet interface IP address!",
+					zap.Error(err), zap.Any("ethernetInterface", ethernetInterface))
+				continue
 			}
 
-			networkDomain := strings.ToLower(network.Name)
-
-			if forwardCIDR.Contains(ip) {
-				exists = true
-				logger.Debug("buildDynamicReverseRRSets: Network membership found",
-					zap.Any("network", network.Name),
-					zap.Any("forwardCIDR", forwardCIDR), zap.Any("IP", ip))
-
-				reverseZoneName := common.GetReverseZoneName(forwardCIDR)
-				cidrParts := strings.Split(ip.String(), ".")
-
-				logger.Debug("buildDynamicReverseRRSets: Calculated reverse zone membership",
-					zap.Any("reverseZoneName", reverseZoneName),
-					zap.Any("reverseName", common.GetReverseName(cidrParts)))
-
-				primaryName := fmt.Sprintf("%s.%s.%s.", ethernetInterface.CompID, networkDomain, *baseDomain)
-
-				rrsetReverse := powerdns.RRset{
-					Name:       powerdns.String(common.MakeDomainCanonical(common.GetReverseName(cidrParts))),
-					Type:       powerdns.RRTypePtr(powerdns.RRTypePTR),
-					TTL:        powerdns.Uint32(3600),
-					ChangeType: powerdns.ChangeTypePtr(powerdns.ChangeTypeReplace),
-					Records: []powerdns.Record{
-						{
-							Content:  powerdns.String(primaryName),
-							Disabled: powerdns.Bool(false),
-						},
-					},
+			// Figure out what SLS network we're in
+			var exists bool = false
+			for _, network := range networks {
+				var networkProperties NetworkExtraProperties
+				err = mapstructure.Decode(network.ExtraPropertiesRaw, &networkProperties)
+				if err != nil {
+					return
+				}
+				var forwardCIDR *net.IPNet
+				_, forwardCIDR, err = net.ParseCIDR(networkProperties.CIDR)
+				if err != nil {
+					return
 				}
 
-				dynamicRRSets = append(dynamicRRSets, rrsetReverse)
+				networkDomain := strings.ToLower(network.Name)
 
+				if forwardCIDR.Contains(ip) {
+					exists = true
+					logger.Debug("buildDynamicReverseRRSets: Network membership found",
+						zap.Any("network", network.Name),
+						zap.Any("forwardCIDR", forwardCIDR), zap.Any("IP", ip))
+
+					reverseZoneName := common.GetReverseZoneName(forwardCIDR)
+					cidrParts := strings.Split(ip.String(), ".")
+
+					logger.Debug("buildDynamicReverseRRSets: Calculated reverse zone membership",
+						zap.Any("reverseZoneName", reverseZoneName),
+						zap.Any("reverseName", common.GetReverseName(cidrParts)))
+
+					primaryName := fmt.Sprintf("%s.%s.%s.", ethernetInterface.CompID, networkDomain, *baseDomain)
+
+					rrsetReverse := powerdns.RRset{
+						Name:       powerdns.String(common.MakeDomainCanonical(common.GetReverseName(cidrParts))),
+						Type:       powerdns.RRTypePtr(powerdns.RRTypePTR),
+						TTL:        powerdns.Uint32(3600),
+						ChangeType: powerdns.ChangeTypePtr(powerdns.ChangeTypeReplace),
+						Records: []powerdns.Record{
+							{
+								Content:  powerdns.String(primaryName),
+								Disabled: powerdns.Bool(false),
+							},
+						},
+					}
+
+					dynamicRRSets = append(dynamicRRSets, rrsetReverse)
+
+				}
 			}
-		}
-		if exists == false {
-			logger.Debug("buildDynamicReverseRRSets: ethernetInterfaces record does not belong to any SLS network",
-				zap.Any("ethernetInterfaces", ethernetInterface))
+			if exists == false {
+				logger.Debug("buildDynamicReverseRRSets: ethernetInterfaces record does not belong to any SLS network",
+					zap.Any("ethernetInterfaces", ethernetInterface))
+			}
 		}
 	}
 	return
@@ -491,7 +493,7 @@ func buildStaticReverseRRSets(networks []sls_common.Network,
 }
 
 func buildDynamicForwardRRsets(hardware []sls_common.GenericHardware, networks []sls_common.Network,
-	ethernetInterfaces []sm.CompEthInterface) (dynamicRRSets []powerdns.RRset,
+	ethernetInterfaces []sm.CompEthInterfaceV2) (dynamicRRSets []powerdns.RRset,
 	err error) {
 
 	// Start by precomputing network information.
@@ -513,88 +515,91 @@ func buildDynamicForwardRRsets(hardware []sls_common.GenericHardware, networks [
 	}
 
 	// Also build an SLS hardware map.
-	slsHardareMap := make(map[string]sls_common.GenericHardware)
+	slsHardwareMap := make(map[string]sls_common.GenericHardware)
 	for _, device := range hardware {
-		slsHardareMap[device.Xname] = device
+		slsHardwareMap[device.Xname] = device
 	}
 
 	for _, ethernetInterface := range ethernetInterfaces {
 		// Have to ignore entries without IPs or ComponentIDs.
-		if ethernetInterface.IPAddr == "" || ethernetInterface.CompID == "" {
+		if len(ethernetInterface.IPAddrs) == 0 || ethernetInterface.CompID == "" {
 			continue
 		}
 
-		var belongedNetwork common.NetworkNameCIDRMap
-		ip, _, err := net.ParseCIDR(fmt.Sprintf("%s/32", ethernetInterface.IPAddr))
-		if err != nil {
-			logger.Error("Failed to parse ethernet interface IP!",
-				zap.Error(err), zap.Any("ethernetInterface", ethernetInterface))
-			continue
-		}
+		for _, ethernetIP := range ethernetInterface.IPAddrs {
 
-		// First figure out what network this IP belongs to.
-		for _, network := range networkNameCIDRMaps {
-			if network.CIDR.Contains(ip) {
-				belongedNetwork = network
-				break
+			var belongedNetwork common.NetworkNameCIDRMap
+			ip, _, err := net.ParseCIDR(fmt.Sprintf("%s/32", ethernetIP.IPAddr))
+			if err != nil {
+				logger.Debug("Failed to parse ethernet interface IP!",
+					zap.Error(err), zap.Any("ethernetInterface", ethernetInterface))
+				continue
 			}
-		}
 
-		if (belongedNetwork == common.NetworkNameCIDRMap{}) {
-			logger.Error("Failed to find a network this ethernet interface belongs to!",
-				zap.Any("ethernetInterface", ethernetInterface))
-			continue
-		}
+			// First figure out what network this IP belongs to.
+			for _, network := range networkNameCIDRMaps {
+				if network.CIDR.Contains(ip) {
+					belongedNetwork = network
+					break
+				}
+			}
 
-		// Now we know the network path.
-		networkDomain := strings.ToLower(belongedNetwork.Name)
+			if (belongedNetwork == common.NetworkNameCIDRMap{}) {
+				logger.Error("Failed to find a network this ethernet interface belongs to!",
+					zap.Any("ethernetInterface", ethernetInterface))
+				continue
+			}
 
-		// Start by making the core A record.
-		primaryName := fmt.Sprintf("%s.%s.%s.", ethernetInterface.CompID, networkDomain, *baseDomain)
-		primaryRRset := powerdns.RRset{
-			Name:       powerdns.String(primaryName),
-			Type:       powerdns.RRTypePtr(powerdns.RRTypeA),
-			TTL:        powerdns.Uint32(3600),
-			ChangeType: powerdns.ChangeTypePtr(powerdns.ChangeTypeReplace),
-			Records: []powerdns.Record{
-				{
-					Content:  powerdns.String(ethernetInterface.IPAddr),
-					Disabled: powerdns.Bool(false),
-				},
-			},
-		}
-		dynamicRRSets = append(dynamicRRSets, primaryRRset)
+			// Now we know the network path.
+			networkDomain := strings.ToLower(belongedNetwork.Name)
 
-		// Now we can create CNAME records for all of the aliases.
-		// Start by getting the SLS hardware entry.
-		slsEntry, found := slsHardareMap[ethernetInterface.CompID]
-		if !found {
-			logger.Error("Failed to find SLS entry for ethernet interface!",
-				zap.Any("ethernetInterface", ethernetInterface))
-			continue
-		}
-
-		var extraProperties sls_common.ComptypeNode
-		err = mapstructure.Decode(slsEntry.ExtraPropertiesRaw, &extraProperties)
-		if err != nil {
-			logger.Error("Failed to decode node extra properties!", zap.Error(err))
-			continue
-		}
-
-		for _, alias := range extraProperties.Aliases {
-			aliasRRset := powerdns.RRset{
-				Name:       powerdns.String(fmt.Sprintf("%s.%s.%s.", alias, networkDomain, *baseDomain)),
-				Type:       powerdns.RRTypePtr(powerdns.RRTypeCNAME),
+			// Start by making the core A record.
+			primaryName := fmt.Sprintf("%s.%s.%s.", ethernetInterface.CompID, networkDomain, *baseDomain)
+			primaryRRset := powerdns.RRset{
+				Name:       powerdns.String(primaryName),
+				Type:       powerdns.RRTypePtr(powerdns.RRTypeA),
 				TTL:        powerdns.Uint32(3600),
 				ChangeType: powerdns.ChangeTypePtr(powerdns.ChangeTypeReplace),
 				Records: []powerdns.Record{
 					{
-						Content:  powerdns.String(primaryName),
+						Content:  powerdns.String(ethernetIP.IPAddr),
 						Disabled: powerdns.Bool(false),
 					},
 				},
 			}
-			dynamicRRSets = append(dynamicRRSets, aliasRRset)
+			dynamicRRSets = append(dynamicRRSets, primaryRRset)
+
+			// Now we can create CNAME records for all of the aliases.
+			// Start by getting the SLS hardware entry.
+			slsEntry, found := slsHardwareMap[ethernetInterface.CompID]
+			if !found {
+				logger.Error("Failed to find SLS entry for ethernet interface!",
+					zap.Any("ethernetInterface", ethernetInterface))
+				continue
+			}
+
+			var extraProperties sls_common.ComptypeNode
+			err = mapstructure.Decode(slsEntry.ExtraPropertiesRaw, &extraProperties)
+			if err != nil {
+				logger.Error("Failed to decode node extra properties!", zap.Error(err))
+				continue
+			}
+
+			for _, alias := range extraProperties.Aliases {
+				aliasRRset := powerdns.RRset{
+					Name:       powerdns.String(fmt.Sprintf("%s.%s.%s.", alias, networkDomain, *baseDomain)),
+					Type:       powerdns.RRTypePtr(powerdns.RRTypeCNAME),
+					TTL:        powerdns.Uint32(3600),
+					ChangeType: powerdns.ChangeTypePtr(powerdns.ChangeTypeReplace),
+					Records: []powerdns.Record{
+						{
+							Content:  powerdns.String(primaryName),
+							Disabled: powerdns.Bool(false),
+						},
+					},
+				}
+				dynamicRRSets = append(dynamicRRSets, aliasRRset)
+			}
 		}
 	}
 

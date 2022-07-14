@@ -356,7 +356,6 @@ func buildStaticForwardRRSets(networks []sls_common.Network, hardware []sls_comm
 func buildDynamicReverseRRSets(networks []sls_common.Network, ethernetInterfaces []sm.CompEthInterfaceV2) (dynamicRRSets []powerdns.RRset, err error) {
 
 	// Loop round SMD ethernetInterfaces and then build a list of rrSets
-	// TODO: Update for SMD v2
 	for _, ethernetInterface := range ethernetInterfaces {
 		if len(ethernetInterface.IPAddrs) == 0 || ethernetInterface.CompID == "" {
 			// Can't process entries that don't have an IP or component ID.
@@ -368,7 +367,7 @@ func buildDynamicReverseRRSets(networks []sls_common.Network, ethernetInterfaces
 			var ip net.IP
 			ip, _, err = net.ParseCIDR(fmt.Sprintf("%s/32", ethernetIP.IPAddr))
 			if err != nil {
-				logger.Error("Failed to parse ethernet interface IP address!",
+				logger.Debug("Failed to parse ethernet interface IP address!",
 					zap.Error(err), zap.Any("ethernetInterface", ethernetInterface))
 				continue
 			}
@@ -532,7 +531,7 @@ func buildDynamicForwardRRsets(hardware []sls_common.GenericHardware, networks [
 			var belongedNetwork common.NetworkNameCIDRMap
 			ip, _, err := net.ParseCIDR(fmt.Sprintf("%s/32", ethernetIP.IPAddr))
 			if err != nil {
-				logger.Error("Failed to parse ethernet interface IP!",
+				logger.Debug("Failed to parse ethernet interface IP!",
 					zap.Error(err), zap.Any("ethernetInterface", ethernetInterface))
 				continue
 			}

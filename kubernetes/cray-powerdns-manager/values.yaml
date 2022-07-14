@@ -93,6 +93,7 @@ manager:
   primary_server: ""
   secondary_servers: ""
   notify_zones: ""
+  base_domain: example.com
 global:
   chart:
     name: cray-powerdns-manager

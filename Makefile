@@ -49,6 +49,7 @@ chart-package: ${CHARTDIR}/.packaged/${NAME}-${CHART_VERSION}.tgz
 
 ${CHARTDIR}/.packaged/${NAME}-${CHART_VERSION}.tgz: ${CHARTDIR}/.packaged
 	CMD="dep up ${CHARTDIR}/${NAME}" $(MAKE) helm
+	sed -e '/.*base_domain: example/d' -i ${CHARTDIR}/${NAME}/values.yaml
 	CMD="package ${CHARTDIR}/${NAME} -d ${CHARTDIR}/.packaged" $(MAKE) helm
 
 ${CHARTDIR}/.packaged:

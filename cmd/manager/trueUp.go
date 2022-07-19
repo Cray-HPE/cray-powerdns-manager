@@ -327,8 +327,12 @@ func buildStaticForwardRRSets(networks []sls_common.Network, hardware []sls_comm
 
 				// Now create CNAME records for each of the aliases.
 				for _, alias := range reservation.Aliases {
-					// Avoid bad names.
-					if strings.Contains(alias, ".") {
+					/* Avoid bad names such as .local etc.
+					   The SLS aliases can contain the node xname which results in this
+					   rather unfortunate DNS record if not removed
+
+					   x3000c0s3b0n0.nmn.drax.dev.cray.com	3600	IN	CNAME	x3000c0s3b0n0.nmn.drax.dev.cray.com.  */
+					if strings.Contains(alias, ".") || alias == node.Xname {
 						continue
 					}
 
@@ -788,10 +792,10 @@ func trueUpDNS() {
 		allMasterZones = append(allMasterZones, masterZones...)
 		allMasterZones = append(allMasterZones, reverseZones...)
 
-                // Build the RRSets, static SLS records first then the HSM dynamic records.
-                // The PowerDNS API will not permit the submission of duplicates so drop entries
-                // that already exist in finalRRSet before passing to trueUpRRSets() to make the
-                // API call.
+		// Build the RRSets, static SLS records first then the HSM dynamic records.
+		// The PowerDNS API will not permit the submission of duplicates so drop entries
+		// that already exist in finalRRSet before passing to trueUpRRSets() to make the
+		// API call.
 		staticRRSets, err := buildStaticForwardRRSets(networks, hardware)
 		if err != nil {
 			logger.Error("Failed to build static RRsets!", zap.Error(err))
@@ -828,7 +832,7 @@ func trueUpDNS() {
 		if err != nil {
 			logger.Error("Failed to build reverse zone RRsets!",
 				zap.Error(err))
-		} 
+		}
 
 		for _, RRSet := range dynamicRRSetsReverse {
 			if !common.RRsetsContains(finalRRSet, RRSet) {

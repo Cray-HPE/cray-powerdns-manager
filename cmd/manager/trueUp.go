@@ -788,10 +788,16 @@ func trueUpDNS() {
 		allMasterZones = append(allMasterZones, masterZones...)
 		allMasterZones = append(allMasterZones, reverseZones...)
 
+                // Build the RRSets, static SLS records first then the HSM dynamic records.
+                // The PowerDNS API will not permit the submission of duplicates so drop entries
+                // that already exist in finalRRSet before passing to trueUpRRSets() to make the
+                // API call.
 		staticRRSets, err := buildStaticForwardRRSets(networks, hardware)
 		if err != nil {
 			logger.Error("Failed to build static RRsets!", zap.Error(err))
 		}
+		finalRRSet = append(finalRRSet, staticRRSets...)
+
 		for _, reverseZone := range reverseZones {
 			staticRRSetsReverse, err := buildStaticReverseRRSets(networks, reverseZone)
 			if err != nil {
@@ -808,18 +814,35 @@ func trueUpDNS() {
 			logger.Error("Failed to build dynamic RRsets!", zap.Error(err))
 		}
 
+		for _, RRSet := range dynamicRRSets {
+			if !common.RRsetsContains(finalRRSet, RRSet) {
+				logger.Debug("Adding RRset", zap.Any("rrSet", RRSet))
+				finalRRSet = append(finalRRSet, RRSet)
+			} else {
+				logger.Debug("Refusing to add duplicate RRset", zap.Any("rrSet", RRSet))
+			}
+
+		}
+
 		dynamicRRSetsReverse, err := buildDynamicReverseRRSets(networks, ethernetInterfaces)
 		if err != nil {
 			logger.Error("Failed to build reverse zone RRsets!",
 				zap.Error(err))
+		} 
+
+		for _, RRSet := range dynamicRRSetsReverse {
+			if !common.RRsetsContains(finalRRSet, RRSet) {
+				logger.Debug("Adding RRset", zap.Any("rrSet", RRSet))
+				finalRRSet = append(finalRRSet, RRSet)
+			} else {
+				logger.Debug("Refusing to add duplicate RRset", zap.Any("rrSet", RRSet))
+			}
+
 		}
-		finalRRSet = append(finalRRSet, dynamicRRSetsReverse...)
 
 		// At this point we have computed every correct RRSet necessary. Now the only task is to add the ones that are
 		// missing and remove the ones that shouldn't be there.
 		// TODO: Add the remove entries.
-		finalRRSet = append(finalRRSet, staticRRSets...)
-		finalRRSet = append(finalRRSet, dynamicRRSets...)
 
 		// Force a sync to any slave servers if we did something.
 		if trueUpRRSets(finalRRSet, allMasterZones) {

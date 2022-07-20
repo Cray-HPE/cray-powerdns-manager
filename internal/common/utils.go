@@ -129,6 +129,16 @@ func RRsetsEqual(a powerdns.RRset, b powerdns.RRset) bool {
 	return true
 }
 
+func RRsetsContains(a []powerdns.RRset, b powerdns.RRset) bool {
+
+        for _, rrset := range a {
+                if RRsetsEqual(rrset, b) {
+                        return true
+                }
+        }
+        return false
+}
+
 // Sorting functions for arrays of zones.
 
 func (zones PowerDNSZones) Len() int {

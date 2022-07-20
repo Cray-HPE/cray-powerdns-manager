@@ -35,7 +35,7 @@ cray-service:
       name: cray-powerdns-manager
       image:
         repository: artifactory.algol60.net/csm-docker/stable/cray-powerdns-manager
-        pullPolicy: Always
+        pullPolicy: IfNotPresent
       ports:
         - name: http
           containerPort: 8080
@@ -97,5 +97,5 @@ manager:
 global:
   chart:
     name: cray-powerdns-manager
-    version: 0.6.8
-  appVersion: 0.6.8
+    version: 0.6.9
+  appVersion: 0.6.9

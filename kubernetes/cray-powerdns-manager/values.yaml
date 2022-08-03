@@ -85,6 +85,36 @@ cray-service:
         - name: dnssec-keys
           mountPath: /keys
           readOnly: true
+    cray-externaldns-manager:
+      name: cray-externaldns-manager
+      image:
+        repository: artifactory.algol60.net/csm-docker/stable/cray-powerdns-manager
+        pullPolicy: IfNotPresent
+      command:
+        - /usr/local/bin/cray-externaldns-manager
+      ports:
+        - name: http
+          containerPort: 8080
+      env:
+        - name: PDNS_URL
+          value: http://cray-dns-powerdns-api:8081
+        - name: PDNS_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: cray-powerdns-credentials
+              key: pdns_api_key
+      livenessProbe:
+        httpGet:
+          port: 8080
+          path: /v1/liveness
+        initialDelaySeconds: 10
+        periodSeconds: 30
+      readinessProbe:
+        httpGet:
+          port: 8080
+          path: /v1/readiness
+        initialDelaySeconds: 15
+        periodSeconds: 30
   ingress:
     enabled: true
     prefix: /apis/powerdns-manager/
@@ -97,5 +127,5 @@ manager:
 global:
   chart:
     name: cray-powerdns-manager
-    version: 0.6.9
-  appVersion: 0.6.9
+    version: 0.7.0
+  appVersion: 0.7.0

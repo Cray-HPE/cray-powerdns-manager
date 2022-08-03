@@ -94,7 +94,7 @@ cray-service:
         - /usr/local/bin/cray-externaldns-manager
       ports:
         - name: http
-          containerPort: 8080
+          containerPort: 8081
       env:
         - name: PDNS_URL
           value: http://cray-dns-powerdns-api:8081
@@ -105,13 +105,13 @@ cray-service:
               key: pdns_api_key
       livenessProbe:
         httpGet:
-          port: 8080
+          port: 8081
           path: /v1/liveness
         initialDelaySeconds: 10
         periodSeconds: 30
       readinessProbe:
         httpGet:
-          port: 8080
+          port: 8081
           path: /v1/readiness
         initialDelaySeconds: 15
         periodSeconds: 30

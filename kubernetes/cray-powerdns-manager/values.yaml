@@ -93,7 +93,7 @@ cray-service:
       command:
         - /usr/local/bin/cray-externaldns-manager
       ports:
-        - name: http
+        - name: edns-http
           containerPort: 8081
       env:
         - name: PDNS_URL

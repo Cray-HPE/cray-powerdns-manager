@@ -60,6 +60,7 @@ FROM artifactory.algol60.net/csm-docker/stable/docker.io/library/alpine:3
 LABEL maintainer="Cray, Inc."
 
 COPY --from=builder /usr/local/bin/cray-powerdns-manager /usr/local/bin
+COPY --from=builder /usr/local/bin/cray-externaldns-manager /usr/local/bin
 COPY --from=builder /usr/local/bin/cray-powerdns-visualizer /usr/local/bin
 
 COPY .version /.version

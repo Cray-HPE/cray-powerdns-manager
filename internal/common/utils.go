@@ -27,11 +27,11 @@ package common
 
 import (
 	"fmt"
+	sls_common "github.com/Cray-HPE/hms-sls/pkg/sls-common"
 	"github.com/joeig/go-powerdns/v2"
 	"net"
 	"reflect"
 	"sort"
-	sls_common "github.com/Cray-HPE/hms-sls/pkg/sls-common"
 	"strconv"
 	"strings"
 )
@@ -64,6 +64,21 @@ func GetReverseZoneName(cidr *net.IPNet) string {
 	}
 
 	return fmt.Sprintf("%s%s", strings.Join(reverseCIDR, "."), rdnsDomain)
+}
+
+// GetForwardIP get the IP address from a reverse record name.
+func GetForwardIP(reverseName string) string {
+	var reverseParts []string
+	var forwardIP []string
+
+	reverseParts = strings.Split(strings.TrimSuffix(reverseName, ".in-addr.arpa."), ".")
+
+	for i := len(reverseParts) - 1; i >= 0; i-- {
+		forwardIP = append(forwardIP, reverseParts[i])
+	}
+
+	return strings.Join(forwardIP, ".")
+
 }
 
 // GetReverseName computes a reverse name from a slice of IPv4 parts.
@@ -131,12 +146,12 @@ func RRsetsEqual(a powerdns.RRset, b powerdns.RRset) bool {
 
 func RRsetsContains(a []powerdns.RRset, b powerdns.RRset) bool {
 
-        for _, rrset := range a {
-                if RRsetsEqual(rrset, b) {
-                        return true
-                }
-        }
-        return false
+	for _, rrset := range a {
+		if RRsetsEqual(rrset, b) {
+			return true
+		}
+	}
+	return false
 }
 
 // Sorting functions for arrays of zones.

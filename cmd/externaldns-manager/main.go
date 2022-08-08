@@ -417,7 +417,7 @@ func main() {
 	}
 	httpClient.HTTPClient.Transport = transport
 
-	httpClient.RetryMax = 3
+	httpClient.RetryMax = 4
 	httpClient.RetryWaitMax = time.Second * 2
 
 	// Also, since we're using Zap logger it makes sense to set the logger to use the one we've already setup.
@@ -426,7 +426,7 @@ func main() {
 
 	// Set up the PowerDNS configuration.
 	pdns = powerdns.NewClient(*pdnsURL, "localhost", map[string]string{"X-API-Key": *pdnsAPIKey},
-		httpClient.HTTPClient)
+		httpClient.StandardClient())
 
 	WaitGroup.Add(1)
 	logger.Info("Starting up main loop...")

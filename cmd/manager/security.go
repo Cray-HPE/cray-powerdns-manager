@@ -27,11 +27,12 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/Cray-HPE/cray-powerdns-manager/internal/common"
 	"github.com/joeig/go-powerdns/v2"
 	"io/ioutil"
 	"net/http"
-	"github.com/Cray-HPE/cray-powerdns-manager/internal/common"
 	"strings"
 )
 
@@ -113,9 +114,15 @@ func AddOrUpdateTSIGKey(key common.DNSKey) error {
 
 	// Get any existing key by this name.
 	existingTSIGKey, err = pdns.TSIGKeys.Get(key.Name)
+	var pdnsErr *powerdns.Error
 	if err != nil {
-		pdnsErr := err.(*powerdns.Error)
-		if pdnsErr.StatusCode != http.StatusNotFound {
+		if errors.As(err, &pdnsErr) {
+			// If we end up here then some PowerDNS API error occurred, ignore 404 as the key may not exist yet.
+			if pdnsErr.StatusCode != http.StatusNotFound {
+				return fmt.Errorf("failed to perform TSIG key lookup: %w", pdnsErr)
+			}
+		} else {
+			// More general error case. Connection refused, connection timeout etc.
 			return fmt.Errorf("failed to perform TSIG key lookup: %w", err)
 		}
 	}

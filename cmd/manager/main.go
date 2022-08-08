@@ -28,6 +28,8 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"github.com/Cray-HPE/cray-powerdns-manager/internal/common"
+	"github.com/Cray-HPE/cray-powerdns-manager/internal/httpLogger"
 	"github.com/gin-gonic/gin"
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/joeig/go-powerdns/v2"
@@ -37,8 +39,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"github.com/Cray-HPE/cray-powerdns-manager/internal/common"
-	"github.com/Cray-HPE/cray-powerdns-manager/internal/httpLogger"
 	"strings"
 	"sync"
 	"syscall"
@@ -93,7 +93,7 @@ var (
 
 	token string
 
-	notifyZonesArray []string
+	notifyZonesArray       []string
 	ignoreSLSNetworksArray []string
 )
 
@@ -185,7 +185,7 @@ func main() {
 	}
 	httpClient.HTTPClient.Transport = transport
 
-	httpClient.RetryMax = 3
+	httpClient.RetryMax = 10
 	httpClient.RetryWaitMax = time.Second * 2
 
 	// Also, since we're using Zap logger it make sense to set the logger to use the one we've already setup.
@@ -194,7 +194,7 @@ func main() {
 
 	// Setup the PowerDNS configuration.
 	pdns = powerdns.NewClient(*pdnsURL, "localhost", map[string]string{"X-API-Key": *pdnsAPIKey},
-		httpClient.HTTPClient)
+		httpClient.StandardClient())
 
 	// Parse any DNSSEC keys.
 	err := ParseDNSKeys()

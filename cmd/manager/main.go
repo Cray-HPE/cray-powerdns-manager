@@ -185,7 +185,7 @@ func main() {
 	}
 	httpClient.HTTPClient.Transport = transport
 
-	httpClient.RetryMax = 10
+	httpClient.RetryMax = 4
 	httpClient.RetryWaitMax = time.Second * 2
 
 	// Also, since we're using Zap logger it make sense to set the logger to use the one we've already setup.

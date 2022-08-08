@@ -34,7 +34,7 @@ func setupAPI() {
 
 	// Run the router.
 	srv := &http.Server{
-		Addr: ":8080",
+		Addr:    ":8080",
 		Handler: router,
 	}
 

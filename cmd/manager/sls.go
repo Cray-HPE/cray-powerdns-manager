@@ -28,10 +28,10 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	sls_common "github.com/Cray-HPE/hms-sls/pkg/sls-common"
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/mitchellh/mapstructure"
 	"io/ioutil"
-	sls_common "github.com/Cray-HPE/hms-sls/pkg/sls-common"
 	"strings"
 )
 
@@ -82,7 +82,7 @@ func getSLSHardware() (hardware []sls_common.GenericHardware, err error) {
 	if token != "" {
 		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
 	}
-	req	= req.WithContext(ctx)
+	req = req.WithContext(ctx)
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
@@ -111,7 +111,7 @@ func getSLSNetworks() (networks []sls_common.Network, err error) {
 	if token != "" {
 		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
 	}
-	req	= req.WithContext(ctx)
+	req = req.WithContext(ctx)
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
@@ -144,7 +144,7 @@ func getSLSNetworks() (networks []sls_common.Network, err error) {
 		for _, subsetNetwork := range originalNetworks {
 			// Need to ignore the SLS BICAN network plus any others passed in on the command line.
 			for _, netToIgnore := range ignoreSLSNetworksArray {
-				if (subsetNetwork.Name == netToIgnore) {
+				if subsetNetwork.Name == netToIgnore {
 					ignoredNetworks[subsetNetwork.Name] = subsetNetwork
 				}
 			}

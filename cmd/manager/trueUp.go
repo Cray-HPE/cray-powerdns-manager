@@ -577,7 +577,7 @@ func buildDynamicForwardRRsets(hardware []sls_common.GenericHardware, networks [
 			// Start by getting the SLS hardware entry.
 			slsEntry, found := slsHardwareMap[ethernetInterface.CompID]
 			if !found {
-				logger.Error("Failed to find SLS entry for ethernet interface!",
+				logger.Debug("Failed to find SLS entry for ethernet interface!",
 					zap.Any("ethernetInterface", ethernetInterface))
 				continue
 			}

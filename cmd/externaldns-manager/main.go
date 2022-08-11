@@ -238,6 +238,15 @@ func doLoop() {
 			allZones = append(allZones, zone)
 		}
 
+		// Make a map of zones -> zone RRSets to make lookup more efficient
+		// TODO: Phase out allZones in favour of this. Will require rewrite of GetZoneForRRSet and manager changes.
+		zoneRRSetMap := make(map[string][]powerdns.RRset)
+
+		for _, zone := range allZones {
+
+			zoneRRSetMap[*zone.Name] = zone.RRsets
+		}
+
 		// Map of zone -> rrSet which will be used when building the final patch request.
 		actionableRRSetMap := make(map[string]*powerdns.RRsets)
 
@@ -270,6 +279,17 @@ func doLoop() {
 						for _, zone := range patchRRSets {
 							if *zone.Name == *rrSetReverse.Name {
 								logger.Debug("Refusing to add duplicate", zap.Any("rrSetReverse", rrSetReverse))
+								addMe = false
+								break
+							}
+						}
+						// Shouldn't touch records that already exist, SLS still contains some service aliases
+						// so powerdns-manager also manipulates the record causing externaldns-manager and
+						// powerdns-manager to fight over the record if the externaldns annotation is slightly
+						// different to the SLS alias. Let powerdns-manager win by leaving the record alone.
+						for _, record := range zoneRRSetMap[*common.GetZoneForRRSet(rrSetReverse, allZones)] {
+							if *record.Name == *rrSetReverse.Name {
+								logger.Debug("Record already exits, nothing to do", zap.Any("rrSetReverse", rrSetReverse))
 								addMe = false
 								break
 							}

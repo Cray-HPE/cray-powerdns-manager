@@ -276,8 +276,8 @@ func doLoop() {
 						// are numerous services bound to the LoadBalancers (for example
 						// cray-oauth2-proxies-customer-management-ingress) that all point to the same IP address.
 						var addMe = true
-						for _, zone := range patchRRSets {
-							if *zone.Name == *rrSetReverse.Name {
+						for _, patchRRSet := range patchRRSets {
+							if *patchRRSet.Name == *rrSetReverse.Name {
 								logger.Debug("Refusing to add duplicate", zap.Any("rrSetReverse", rrSetReverse))
 								addMe = false
 								break

@@ -318,9 +318,6 @@ func doLoop() {
 			}
 		}
 
-		// TODO: Figure out if a record already exists and remove it from the patch list to reduce the size of the API call.
-		// The PowerDNS API does not appear to increment the SOA serial unless anything actually changes so this approach
-		// does not result in unnecessary AXFR notify requests being generated.
 		for _, zone := range patchRRSets {
 			zoneSets := &actionableRRSetMap[*common.GetZoneForRRSet(zone, allZones)].Sets
 			*zoneSets = append(*zoneSets, zone)

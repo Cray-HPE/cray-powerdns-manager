@@ -238,6 +238,15 @@ func doLoop() {
 			allZones = append(allZones, zone)
 		}
 
+		// Make a map of zones -> zone RRSets to make lookup more efficient
+		// TODO: Phase out allZones in favour of this. Will require rewrite of GetZoneForRRSet and manager changes.
+		zoneRRSetMap := make(map[string][]powerdns.RRset)
+
+		for _, zone := range allZones {
+
+			zoneRRSetMap[*zone.Name] = zone.RRsets
+		}
+
 		// Map of zone -> rrSet which will be used when building the final patch request.
 		actionableRRSetMap := make(map[string]*powerdns.RRsets)
 
@@ -267,9 +276,20 @@ func doLoop() {
 						// are numerous services bound to the LoadBalancers (for example
 						// cray-oauth2-proxies-customer-management-ingress) that all point to the same IP address.
 						var addMe = true
-						for _, zone := range patchRRSets {
-							if *zone.Name == *rrSetReverse.Name {
+						for _, patchRRSet := range patchRRSets {
+							if *patchRRSet.Name == *rrSetReverse.Name {
 								logger.Debug("Refusing to add duplicate", zap.Any("rrSetReverse", rrSetReverse))
+								addMe = false
+								break
+							}
+						}
+						// Shouldn't touch records that already exist, SLS still contains some service aliases
+						// so powerdns-manager also manipulates the record causing externaldns-manager and
+						// powerdns-manager to fight over the record if the externaldns annotation is slightly
+						// different to the SLS alias. Let powerdns-manager win by leaving the record alone.
+						for _, record := range zoneRRSetMap[*common.GetZoneForRRSet(rrSetReverse, allZones)] {
+							if *record.Name == *rrSetReverse.Name {
+								logger.Debug("Record already exits, nothing to do", zap.Any("rrSetReverse", rrSetReverse))
 								addMe = false
 								break
 							}
@@ -298,9 +318,6 @@ func doLoop() {
 			}
 		}
 
-		// TODO: Figure out if a record already exists and remove it from the patch list to reduce the size of the API call.
-		// The PowerDNS API does not appear to increment the SOA serial unless anything actually changes so this approach
-		// does not result in unnecessary AXFR notify requests being generated.
 		for _, zone := range patchRRSets {
 			zoneSets := &actionableRRSetMap[*common.GetZoneForRRSet(zone, allZones)].Sets
 			*zoneSets = append(*zoneSets, zone)

@@ -110,12 +110,14 @@ func trueUpMasterZones(baseDomain string, networks []sls_common.Network,
 	masterNameserver common.Nameserver, slaveNameservers []common.Nameserver) (masterZones []*powerdns.Zone) {
 	// Create a list of all the master zones.
 	masterZoneNames := []string{baseDomain}
-	for _, network := range networks {
-		networkDomain := strings.ToLower(network.Name)
-		fullDomain := fmt.Sprintf("%s.%s", networkDomain, baseDomain)
 
-		masterZoneNames = append(masterZoneNames, fullDomain)
-	}
+//	to be removed before PR
+//	for _, network := range networks {
+//		networkDomain := strings.ToLower(network.Name)
+//		fullDomain := fmt.Sprintf("%s.%s", networkDomain, baseDomain)
+//
+//		masterZoneNames = append(masterZoneNames, fullDomain)
+//	}
 
 	// Every zone should have at least the master nameserver.
 	masterNameserverRRSet := common.GetNameserverRRset(masterNameserver)

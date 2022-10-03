@@ -129,7 +129,55 @@ func trueUpMasterZones(baseDomain string, networks []sls_common.Network,
 		// the A record of the master server otherwise it won't let us create the zone.
 		if masterZoneName == baseDomain {
 			nameserverRRSets = append(nameserverRRSets, masterNameserverRRSet)
+
+			for _, zone := range masterZoneNames {
+				if zone == baseDomain {
+					continue
+				}
+				logger.Info("Add NS records", zap.Any("masterZoneName", zone))
+				ns := powerdns.RRset{
+					Name:       powerdns.String(common.MakeDomainCanonical(zone)),
+					Type:       powerdns.RRTypePtr(powerdns.RRTypeNS),
+					TTL:        powerdns.Uint32(3600),
+					ChangeType: powerdns.ChangeTypePtr(powerdns.ChangeTypeReplace),
+					Records: []powerdns.Record{
+						{
+							Content:  powerdns.String(common.MakeDomainCanonical(masterNameserver.FQDN)),
+							Disabled: powerdns.Bool(false),
+						},
+					},
+				}
+				nameserverRRSets = append(nameserverRRSets, ns)
+			}
 		}
+
+		// Generate a SOA record that has the correct nameserver name
+		soaString := fmt.Sprintf("%s %s %s %s %s %s %s",
+			*masterNameserverRRSet.Name,
+			fmt.Sprintf("hostmaster.%s.", masterZoneName),
+			"0", // Serial
+			*soaRefresh,
+			*soaRetry,
+			*soaExpiry,
+			*soaMinimum,
+		)
+
+		logger.Info("Generated SOA string", zap.Any("soaString", soaString))
+
+		soa := powerdns.RRset{
+			Name:       powerdns.String(common.MakeDomainCanonical(masterZoneName)),
+			Type:       powerdns.RRTypePtr(powerdns.RRTypeSOA),
+			TTL:        powerdns.Uint32(3600),
+			ChangeType: powerdns.ChangeTypePtr(powerdns.ChangeTypeReplace),
+			Records: []powerdns.Record{
+				{
+					Content:  powerdns.String(soaString),
+					Disabled: powerdns.Bool(false),
+				},
+			},
+		}
+
+		nameserverRRSets = append(nameserverRRSets, soa)
 
 		// Now figure out if this zone is enabled for zone transfers and if so add the slave server(s) to the
 		// name server list.

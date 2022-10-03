@@ -1,6 +1,6 @@
 # cray-powerdns-manager
 
-![Version: 0.5.2](https://img.shields.io/badge/Version-0.5.2-informational?style=flat-square) ![AppVersion: 0.5.2](https://img.shields.io/badge/AppVersion-0.5.2-informational?style=flat-square)
+![Version: 0.7.5](https://img.shields.io/badge/Version-0.7.5-informational?style=flat-square) ![AppVersion: 0.7.5](https://img.shields.io/badge/AppVersion-0.7.5-informational?style=flat-square)
 
 Synchronizes all DNS records for Cray EX systems
 
@@ -18,12 +18,31 @@ Synchronizes all DNS records for Cray EX systems
 
 | Repository | Name | Version |
 |------------|------|---------|
-| https://artifactory.algol60.net/artifactory/csm-helm-charts/ | cray-service | ~7.0.0 |
+| https://artifactory.algol60.net/artifactory/csm-helm-charts/ | cray-service | ^8.0.0 |
 
 ## Values
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
+| cray-service.containers.cray-externaldns-manager.command[0] | string | `"/usr/local/bin/cray-externaldns-manager"` |  |
+| cray-service.containers.cray-externaldns-manager.env[0].name | string | `"PDNS_URL"` |  |
+| cray-service.containers.cray-externaldns-manager.env[0].value | string | `"http://cray-dns-powerdns-api:8081"` |  |
+| cray-service.containers.cray-externaldns-manager.env[1].name | string | `"PDNS_API_KEY"` |  |
+| cray-service.containers.cray-externaldns-manager.env[1].valueFrom.secretKeyRef.key | string | `"pdns_api_key"` |  |
+| cray-service.containers.cray-externaldns-manager.env[1].valueFrom.secretKeyRef.name | string | `"cray-powerdns-credentials"` |  |
+| cray-service.containers.cray-externaldns-manager.image.pullPolicy | string | `"IfNotPresent"` |  |
+| cray-service.containers.cray-externaldns-manager.image.repository | string | `"artifactory.algol60.net/csm-docker/stable/cray-powerdns-manager"` |  |
+| cray-service.containers.cray-externaldns-manager.livenessProbe.httpGet.path | string | `"/v1/liveness"` |  |
+| cray-service.containers.cray-externaldns-manager.livenessProbe.httpGet.port | int | `8081` |  |
+| cray-service.containers.cray-externaldns-manager.livenessProbe.initialDelaySeconds | int | `10` |  |
+| cray-service.containers.cray-externaldns-manager.livenessProbe.periodSeconds | int | `30` |  |
+| cray-service.containers.cray-externaldns-manager.name | string | `"cray-externaldns-manager"` |  |
+| cray-service.containers.cray-externaldns-manager.ports[0].containerPort | int | `8081` |  |
+| cray-service.containers.cray-externaldns-manager.ports[0].name | string | `"edns-http"` |  |
+| cray-service.containers.cray-externaldns-manager.readinessProbe.httpGet.path | string | `"/v1/readiness"` |  |
+| cray-service.containers.cray-externaldns-manager.readinessProbe.httpGet.port | int | `8081` |  |
+| cray-service.containers.cray-externaldns-manager.readinessProbe.initialDelaySeconds | int | `15` |  |
+| cray-service.containers.cray-externaldns-manager.readinessProbe.periodSeconds | int | `30` |  |
 | cray-service.containers.cray-powerdns-manager.env[0].name | string | `"BASE_DOMAIN"` |  |
 | cray-service.containers.cray-powerdns-manager.env[0].valueFrom.configMapKeyRef.key | string | `"base_domain"` |  |
 | cray-service.containers.cray-powerdns-manager.env[0].valueFrom.configMapKeyRef.name | string | `"cray-powerdns-manager-config"` |  |
@@ -43,7 +62,7 @@ Synchronizes all DNS records for Cray EX systems
 | cray-service.containers.cray-powerdns-manager.env[5].valueFrom.secretKeyRef.name | string | `"cray-powerdns-credentials"` |  |
 | cray-service.containers.cray-powerdns-manager.env[6].name | string | `"KEY_DIRECTORY"` |  |
 | cray-service.containers.cray-powerdns-manager.env[6].value | string | `"/keys"` |  |
-| cray-service.containers.cray-powerdns-manager.image.pullPolicy | string | `"Always"` |  |
+| cray-service.containers.cray-powerdns-manager.image.pullPolicy | string | `"IfNotPresent"` |  |
 | cray-service.containers.cray-powerdns-manager.image.repository | string | `"artifactory.algol60.net/csm-docker/stable/cray-powerdns-manager"` |  |
 | cray-service.containers.cray-powerdns-manager.livenessProbe.httpGet.path | string | `"/v1/liveness"` |  |
 | cray-service.containers.cray-powerdns-manager.livenessProbe.httpGet.port | int | `8080` |  |
@@ -69,9 +88,10 @@ Synchronizes all DNS records for Cray EX systems
 | cray-service.serviceAccountName | string | `"jobs-watcher"` |  |
 | cray-service.strategy.type | string | `"Recreate"` |  |
 | cray-service.type | string | `"Deployment"` |  |
-| global.appVersion | string | `"0.5.2"` |  |
+| global.appVersion | string | `"0.7.5"` |  |
 | global.chart.name | string | `"cray-powerdns-manager"` |  |
-| global.chart.version | string | `"0.5.2"` |  |
+| global.chart.version | string | `"0.7.5"` |  |
+| manager.base_domain | string | `"example.com"` |  |
 | manager.notify_zones | string | `""` |  |
 | manager.primary_server | string | `""` |  |
 | manager.secondary_servers | string | `""` |  |

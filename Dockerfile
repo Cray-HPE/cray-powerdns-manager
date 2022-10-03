@@ -22,7 +22,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 # Build base just has the packages installed we need.
-FROM artifactory.algol60.net/docker.io/library/golang:1.17.6-alpine AS build-base
+FROM artifactory.algol60.net/docker.io/library/golang:1.18-alpine AS build-base
 
 RUN set -ex \
     && apk update \

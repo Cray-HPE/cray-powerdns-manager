@@ -35,6 +35,13 @@ HELM_IMAGE ?= artifactory.algol60.net/docker.io/alpine/helm:3.7.1
 HELM_UNITTEST_IMAGE ?= artifactory.algol60.net/docker.io/quintush/helm-unittest
 HELM_DOCS_IMAGE ?= artifactory.algol60.net/docker.io/jnorwood/helm-docs:v1.5.0
 
+ifeq ($(shell uname -s),Darwin)
+	HELM_CONFIG_HOME ?= $(HOME)/Library/Preferences/helm
+else
+	HELM_CONFIG_HOME ?= $(HOME)/.config/helm
+endif
+COMMA := ,
+
 all : image chart
 
 image:
@@ -60,10 +67,11 @@ chart-metadata:
 helm:
 	docker run --rm \
 	    --user $(shell id -u):$(shell id -g) \
+	    $(if $(wildcard $(HELM_CONFIG_HOME)/.),--mount type=bind$(COMMA)src=$(HELM_CONFIG_HOME)$(COMMA)dst=/tmp/.helm/config) \
 	    --mount type=bind,src="$(shell pwd)",dst=/src \
 	    -w /src \
 	    -e HELM_CACHE_HOME=/src/.helm/cache \
-	    -e HELM_CONFIG_HOME=/src/.helm/config \
+	    -e HELM_CONFIG_HOME=/tmp/.helm/config \
 	    -e HELM_DATA_HOME=/src/.helm/data \
 	    $(HELM_IMAGE) \
 	    $(CMD)

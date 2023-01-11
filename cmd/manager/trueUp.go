@@ -67,7 +67,7 @@ func ensureMasterZone(zoneName string, nameserverFQDNs []string, rrSets []powerd
 				zone := &powerdns.Zone{
 					Name:             &zoneName,
 					Kind:             powerdns.ZoneKindPtr(powerdns.MasterZoneKind),
-					DNSsec:           powerdns.Bool(customDNSSECKey == nil),
+					DNSsec:           powerdns.Bool(customDNSSECKey != nil),
 					Nameservers:      nameserverFQDNs,
 					RRsets:           rrSets,
 					MasterTSIGKeyIDs: tsigKeyIDs,
@@ -273,7 +273,7 @@ networks:
 						reverseZone = &powerdns.Zone{
 							Name:             &reverseZoneName,
 							Kind:             powerdns.ZoneKindPtr(powerdns.MasterZoneKind),
-							DNSsec:           powerdns.Bool(true),
+							DNSsec:           powerdns.Bool(customDNSSECKey != nil),
 							Nameservers:      nameserverFQDNs,
 							MasterTSIGKeyIDs: tsigKeyIDs,
 						}

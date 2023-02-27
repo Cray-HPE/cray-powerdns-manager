@@ -11,7 +11,7 @@ require (
 	github.com/mitchellh/mapstructure v1.4.1
 	github.com/namsral/flag v1.7.4-pre
 	github.com/xlab/treeprint v1.1.0
-	go.uber.org/zap v1.18.1
+	go.uber.org/zap v1.24.0
 )
 
 require (

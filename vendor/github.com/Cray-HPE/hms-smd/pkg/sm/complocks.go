@@ -1,6 +1,6 @@
 // MIT License
 //
-// (C) Copyright [2019-2021] Hewlett Packard Enterprise Development LP
+// (C) Copyright [2019-2022] Hewlett Packard Enterprise Development LP
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
 // copy of this software and associated documentation files (the "Software"),
@@ -27,112 +27,10 @@ package sm
 // This package defines structures for component locks
 
 import (
-	"math"
 	"strings"
 
 	base "github.com/Cray-HPE/hms-base"
 )
-
-//
-// Format checking for database keys and query parameters.
-//
-
-var ErrCompLockBadLifetime = base.NewHMSError("sm",
-	"Invalid CompLock lifetime")
-
-///////////////////////////////////////////////////////////////////////////
-//
-// CompLock
-//
-///////////////////////////////////////////////////////////////////////////
-
-// A component lock is a formal, non-overlapping group of components that are
-// reserved by a service.
-type CompLock struct {
-	ID       string   `json:"id"`
-	Created  string   `json:"created,omitempty"`
-	Reason   string   `json:"reason"`
-	Owner    string   `json:"owner"`
-	Lifetime int      `json:"lifetime"`
-	Xnames   []string `json:"xnames"` // List of xname ids, required.
-
-	// Private
-	normalized bool
-	verified   bool
-}
-
-// Allocate and initialize new CompLock struct, validating it.
-// If you already have a created CompLock, you can check the inputs with
-// CompLock.Verify()
-func NewCompLock(reason, owner string, lifetime int, xnames []string) (*CompLock, error) {
-	cl := new(CompLock)
-	cl.Reason = reason
-	cl.Owner = owner
-	// Round lifetime up to the closest minute to be compatible with v2 reservations
-	cl.Lifetime = int(math.Ceil(float64(lifetime) / 60) * 60)
-	cl.Xnames = append([]string(nil), xnames...)
-	cl.Normalize()
-	return cl, cl.Verify()
-}
-
-// Normalize xnames in CompLockMembers.
-func (cl *CompLock) Normalize() {
-	if cl.normalized == true {
-		return
-	}
-	cl.normalized = true
-
-	cl.Lifetime = int(math.Ceil(float64(cl.Lifetime) / 60) * 60)
-	for i, xname := range cl.Xnames {
-		cl.Xnames[i] = base.NormalizeHMSCompID(xname)
-	}
-}
-
-// Check input fields of a group.  If no error is returned, the result should
-// be ok to put into the database.
-func (cl *CompLock) Verify() error {
-	if cl.verified == true {
-		return nil
-	}
-	cl.verified = true
-
-    // Can't be greater than 15 mins
-	if cl.Lifetime <= 0 || cl.Lifetime > 900 {
-		return ErrCompLockBadLifetime
-	}
-
-	for _, xname := range cl.Xnames {
-		if ok := base.IsHMSCompIDValid(xname); ok == false {
-			return base.ErrHMSTypeInvalid
-		}
-	}
-	return nil
-}
-
-// Patchable fields if included in payload.
-type CompLockPatch struct {
-	Reason   *string
-	Owner    *string
-	Lifetime *int
-}
-
-// Normalize CompLockPatch (just lower case tags, basically, but keeping same
-// interface as others.
-func (clp *CompLockPatch) Normalize() {
-	if clp.Lifetime != nil {
-		// Round lifetime up to the closest minute to be compatible with v2 reservations
-		*clp.Lifetime = int(math.Ceil(float64(*clp.Lifetime) / 60) * 60)
-	}
-	return
-}
-
-// Analgous Verify call for CompLockPatch objects.
-func (clp *CompLockPatch) Verify() error {
-	if clp.Lifetime != nil && *clp.Lifetime <= 0 {
-		return ErrCompLockBadLifetime
-	}
-	return nil
-}
 
 //////////////////////////////
 // Locks V2
@@ -241,7 +139,7 @@ type CompLockV2 struct {
 }
 type CompLockV2Status struct {
 	Components []CompLockV2 `json:"Components"`
-	NotFound   []string     `json:"NotFound"`
+	NotFound   []string     `json:"NotFound,omitempty"`
 }
 
 //////////////////////////////////////////////
@@ -252,7 +150,7 @@ type CompLockV2Status struct {
 type CompLockV2Filter struct {
 	ID                  []string `json:"ComponentIDs"`
 	NID                 []string `json:"NID"`
-	Type                []string `json:"Sype"`
+	Type                []string `json:"Type"`
 	State               []string `json:"State"`
 	Flag                []string `json:"Flag"`
 	Enabled             []string `json:"Enabled"`
@@ -266,6 +164,9 @@ type CompLockV2Filter struct {
 	Partition           []string `json:"Partition"`
 	ProcessingModel     string   `json:"ProcessingModel"`
 	ReservationDuration int      `json:"ReservationDuration"`
+	Locked              []string `json:"Locked"`
+	Reserved            []string `json:"Reserved"`
+	ReservationDisabled []string `json:"ReservationDisabled"`
 }
 
 // Release Res, Release/Renew ServRes
@@ -273,6 +174,7 @@ type CompLockV2Key struct {
 	ID  string `json:"ID"`
 	Key string `json:"Key"`
 }
+
 type CompLockV2ReservationFilter struct {
 	ReservationKeys     []CompLockV2Key `json:"ReservationKeys"`
 	ProcessingModel     string          `json:"ProcessingModel"`

@@ -1,6 +1,6 @@
 // MIT License
 //
-// (C) Copyright [2019-2021] Hewlett Packard Enterprise Development LP
+// (C) Copyright [2019-2022] Hewlett Packard Enterprise Development LP
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
 // copy of this software and associated documentation files (the "Software"),
@@ -81,6 +81,7 @@ type ComponentSystemInfo struct {
 	Actions    *ComputerSystemActions `json:"Actions,omitempty"`
 	EthNICInfo []*EthernetNICInfo     `json:"EthernetNICInfo,omitempty"`
 	PowerCtlInfo
+	Controls   []*Control             `json:"Controls,omitempty"`
 }
 
 type ComponentManagerInfo struct {
@@ -149,6 +150,11 @@ type PwrCtlOEMHPE struct {
 
 type PwrCtlRelatedItem struct {
 	Oid string `json:"@odata.id"`
+}
+
+type Control struct {
+	URL     string    `json:"URL"`
+	Control RFControl `json:"Control"`
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -301,6 +307,12 @@ func (c *EpChassis) discoverRemotePhase1() {
 	c.ChildSystems = c.ChassisRF.Links.ComputerSystems
 	if c.ChassisRF.Actions != nil {
 		c.Actions = c.ChassisRF.Actions
+	}
+
+	// Workaround CASMHMS-4954 Apollo 6500 Enclosures missing Model.
+	// Use Name in place of Model.
+	if c.ChassisRF.Model == "" {
+		c.ChassisRF.Model = c.ChassisRF.Name
 	}
 
 	//
@@ -1126,11 +1138,62 @@ func (s *EpSystem) discoverRemotePhase1() {
 	// but we associate it with nodes (systems). There will be a chassis URL
 	// with our system's id if there is info to get.
 	nodeChassis, ok := s.epRF.Chassis.OIDs[s.SystemRF.Id]
+	if !ok {
+		// Intel uses /Chassis/Rackmount/Baseboard instead of /Chassis/<sysid>.
+		// See if "Baseboard" exists.
+		nodeChassis, ok = s.epRF.Chassis.OIDs["Baseboard"]
+	}
+
 	if ok {
 
 		//
 		// Get PowerControl Info if it exists
 		//
+		if nodeChassis.ChassisRF.Controls.Oid != "" {
+			path = nodeChassis.ChassisRF.Controls.Oid
+			ctlURLJSON, err := s.epRF.GETRelative(path)
+			if err != nil || ctlURLJSON == nil {
+				s.LastStatus = HTTPsGetFailed
+				return
+			}
+			s.LastStatus = HTTPsGetOk
+
+			// Decode JSON into PowerControl structure
+			var controlCollection ControlCollection
+			if err := json.Unmarshal(ctlURLJSON, &controlCollection); err != nil {
+				if IsUnmarshalTypeError(err) {
+					errlog.Printf("bad field(s) skipped: %s: %s\n", url, err)
+				} else {
+					errlog.Printf("ERROR: json decode failed: %s: %s\n", url, err)
+					s.LastStatus = EPResponseFailedDecode
+					return
+				}
+			}
+			for _, url := range controlCollection.Members {
+				if url.Oid == "" {
+					continue
+				}
+				controlJSON, err := s.epRF.GETRelative(url.Oid)
+				if err != nil || controlJSON == nil {
+					break
+				}
+				// Decode JSON into PowerControl structure
+				var rfControl RFControl
+				if err := json.Unmarshal(controlJSON, &rfControl); err != nil {
+					if IsUnmarshalTypeError(err) {
+						errlog.Printf("bad field(s) skipped: %s: %s\n", url.Oid, err)
+					} else {
+						errlog.Printf("ERROR: json decode failed: %s: %s\n", url.Oid, err)
+						break
+					}
+				}
+				control := Control{
+					URL: url.Oid,
+					Control: rfControl,
+				}
+				s.Controls = append(s.Controls, &control)
+			}
+		}
 		if nodeChassis.ChassisRF.Power.Oid != "" {
 			path = nodeChassis.ChassisRF.Power.Oid
 			pwrCtlURLJSON, err := s.epRF.GETRelative(path)
@@ -1205,6 +1268,7 @@ func (s *EpSystem) discoverRemotePhase1() {
 					oemPwr.HPE.Status = "OK"
 					oemPwr.HPE.PowerRegulationEnabled = hpeAccPowerService.PowerRegulationEnabled
 					s.PowerURL = hpeAccPowerService.Links.PowerLimit.Oid
+					s.PowerInfo.PowerControl[0].Name = hpePowerLimit.Name
 					break
 				}
 				s.PowerInfo.PowerControl[0].OEM = &oemPwr
@@ -1246,44 +1310,19 @@ func (s *EpSystem) discoverRemotePhase1() {
 			}
 		}
 
+		// The Proliant iLO redfish implementation puts GPUs and HSN NICs under
+		// '/redfish/v1/Chassis/<sysid>/Devices'.
 		//
-		// Get Chassis NetworkAdapter (HSN NIC) info if it exists
+		// They also put HSN NICs under '/redfish/v1/Chassis/<sysid>/NetworkAdapters'.
+		// However, not all of the HSN NICs always show up there and, when they
+		// do, they're missing PartNumber and Manufacturer FRU information.
+		// '/redfish/v1/Chassis/<sysid>/Devices' is a more comprehensive place
+		// to discover the HSN NICs FRU information from in the Proliant iLO
+		// redfish implementation.
 		//
-		if nodeChassis.ChassisRF.NetworkAdapters.Oid == "" {
-			//errlog.Printf("%s: No assembly obj found.\n", topURL)
-			s.NetworkAdapters.Num = 0
-			s.NetworkAdapters.OIDs = make(map[string]*EpNetworkAdapter)
-		} else {
-			path = nodeChassis.ChassisRF.NetworkAdapters.Oid
-			url = nodeChassis.epRF.FQDN + path
-			naJSON, err := s.epRF.GETRelative(path)
-			if err != nil || naJSON == nil {
-				s.LastStatus = HTTPsGetFailed
-				return
-			}
-			if rfDebug > 0 {
-				errlog.Printf("%s: %s\n", url, naJSON)
-			}
-			s.LastStatus = HTTPsGetOk
-
-			var naInfo NetworkAdapterCollection
-			if err := json.Unmarshal(naJSON, &naInfo); err != nil {
-				errlog.Printf("Failed to decode %s: %s\n", url, err)
-				s.LastStatus = EPResponseFailedDecode
-			}
-
-			s.NetworkAdapters.Num = len(naInfo.Members)
-			s.NetworkAdapters.OIDs = make(map[string]*EpNetworkAdapter)
-
-			sort.Sort(ResourceIDSlice(naInfo.Members))
-			for i, naoid := range naInfo.Members {
-				naid := naoid.Basename()
-				s.NetworkAdapters.OIDs[naid] = NewEpNetworkAdapter(s, s.OdataID, s.RedfishType, naoid, i)
-			}
-			s.NetworkAdapters.discoverRemotePhase1()
-		}
-
-		// Discover HPE devices to find GPUs
+		// Attempt to discover HSN NICs under '/redfish/v1/Chassis/<sysid>/Devices'
+		// before trying under '/redfish/v1/Chassis/<sysid>/NetworkAdapters' so they
+		// don't get duplicated.
 		if strings.ToLower(s.SystemRF.Manufacturer) == "hpe" &&
 			nodeChassis.ChassisRF.OEM != nil &&
 			nodeChassis.ChassisRF.OEM.Hpe != nil &&
@@ -1318,6 +1357,41 @@ func (s *EpSystem) discoverRemotePhase1() {
 		} else {
 			s.HpeDevices.Num = 0
 			s.HpeDevices.OIDs = make(map[string]*EpHpeDevice)
+
+			// Non-proliant iLO. Just get Chassis NetworkAdapter (HSN NIC) info if it exists
+			if nodeChassis.ChassisRF.NetworkAdapters.Oid == "" {
+				//errlog.Printf("%s: No assembly obj found.\n", topURL)
+				s.NetworkAdapters.Num = 0
+				s.NetworkAdapters.OIDs = make(map[string]*EpNetworkAdapter)
+			} else {
+				path = nodeChassis.ChassisRF.NetworkAdapters.Oid
+				url = nodeChassis.epRF.FQDN + path
+				naJSON, err := s.epRF.GETRelative(path)
+				if err != nil || naJSON == nil {
+					s.LastStatus = HTTPsGetFailed
+					return
+				}
+				if rfDebug > 0 {
+					errlog.Printf("%s: %s\n", url, naJSON)
+				}
+				s.LastStatus = HTTPsGetOk
+
+				var naInfo NetworkAdapterCollection
+				if err := json.Unmarshal(naJSON, &naInfo); err != nil {
+					errlog.Printf("Failed to decode %s: %s\n", url, err)
+					s.LastStatus = EPResponseFailedDecode
+				}
+
+				s.NetworkAdapters.Num = len(naInfo.Members)
+				s.NetworkAdapters.OIDs = make(map[string]*EpNetworkAdapter)
+
+				sort.Sort(ResourceIDSlice(naInfo.Members))
+				for i, naoid := range naInfo.Members {
+					naid := naoid.Basename()
+					s.NetworkAdapters.OIDs[naid] = NewEpNetworkAdapter(s, s.OdataID, s.RedfishType, naoid, i)
+				}
+				s.NetworkAdapters.discoverRemotePhase1()
+			}
 		}
 	}
 

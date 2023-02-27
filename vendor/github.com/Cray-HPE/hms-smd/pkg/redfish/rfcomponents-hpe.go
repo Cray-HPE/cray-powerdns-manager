@@ -1,6 +1,6 @@
 // MIT License
 //
-// (C) Copyright [2021] Hewlett Packard Enterprise Development LP
+// (C) Copyright [2022-2023] Hewlett Packard Enterprise Development LP
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
 // copy of this software and associated documentation files (the "Software"),
@@ -134,6 +134,16 @@ func (d *EpHpeDevice) discoverRemotePhase1() {
 	}
 	d.RedfishSubtype = d.DeviceRF.DeviceType
 
+	// Workaround CASMHMS-4951 GPUs missing Model and Partnumber.
+	// Use Name in place of Model and ProductPartNumber in place
+	// of PartNumber.
+	if d.DeviceRF.PartNumber == "" {
+		d.DeviceRF.PartNumber = d.DeviceRF.ProductPartNumber
+	}
+	if d.DeviceRF.Model == "" {
+		d.DeviceRF.Model = d.DeviceRF.Name
+	}
+
 	if rfVerbose > 0 {
 		jout, _ := json.MarshalIndent(d, "", "   ")
 		errlog.Printf("%s: %s\n", url, jout)
@@ -180,9 +190,21 @@ func (d *EpHpeDevice) discoverLocalPhase2() {
 
 	// GPUs are under HPE devices on HPE hardware
 	d.Ordinal = d.epRF.getHpeDeviceOrdinal(d)
-	if strings.ToLower(d.RedfishSubtype) == "gpu" {
+	if strings.ToLower(d.RedfishSubtype) == "gpu" &&
+	   !strings.Contains(strings.ToLower(d.DeviceRF.Name), "switch") &&
+	   !strings.Contains(strings.ToLower(d.DeviceRF.Location), "baseboard") {
 		d.ID = d.systemRF.ID + "a" + strconv.Itoa(d.Ordinal)
 		d.Type = base.NodeAccel.String()
+	} else if strings.Contains(strings.ToLower(d.RedfishSubtype), "nic") &&
+	          (strings.Contains(strings.ToLower(d.DeviceRF.Manufacturer), "mellanox") ||
+	           strings.Contains(strings.ToLower(d.DeviceRF.Manufacturer), "hpe") ||
+	           strings.Contains(strings.ToLower(d.DeviceRF.Manufacturer), "bei")) {
+		// Accept Mellanox or Cassini HSN NICs so we ignore non-HSN NICs.
+		// Cassini shows as HPE instead of BEI in Proliant iLO redfish
+		// implementations so we check for both just incase this changes
+		// in the future.
+		d.ID = d.systemRF.ID + "h" + strconv.Itoa(d.Ordinal)
+		d.Type = base.NodeHsnNic.String()
 	} else {
 		// What to do with non-GPUs, trash for now?
 		d.Type = base.HMSTypeInvalid.String()
@@ -206,7 +228,8 @@ func (d *EpHpeDevice) discoverLocalPhase2() {
 		d.Flag = base.FlagOK.String()
 	}
 	// Check if we have something valid to insert into the data store
-	if (base.GetHMSType(d.ID) != base.NodeAccel) || (d.Type != base.NodeAccel.String()) {
+	if (base.GetHMSType(d.ID) != base.NodeAccel || d.Type != base.NodeAccel.String()) &&
+	   (base.GetHMSType(d.ID) != base.NodeHsnNic || d.Type != base.NodeHsnNic.String()) {
 		errlog.Printf("Error: Bad xname ID ('%s') or Type ('%s') for: %s\n", d.ID, d.Type, d.DeviceURL)
 		d.LastStatus = VerificationFailed
 		return
@@ -226,9 +249,21 @@ func (ep *RedfishEP) getHpeDeviceOrdinal(d *EpHpeDevice) int {
 	if len(d.systemRF.HpeDevices.OIDs) > 0 {
 		dsOIDs := make([]string, 0, len(d.systemRF.HpeDevices.OIDs))
 		for oid, device := range d.systemRF.HpeDevices.OIDs {
-			// Get onlt devices of the same type
+			// Get only devices of the same type
 			if strings.ToLower(device.RedfishSubtype) == strings.ToLower(d.RedfishSubtype) {
-				dsOIDs = append(dsOIDs, oid)
+				if strings.Contains(strings.ToLower(d.RedfishSubtype), "nic") {
+					// Accept Mellanox or Cassini HSN NICs so we ignore non-HSN NICs.
+					// Cassini shows as HPE instead of BEI in Proliant iLO redfish
+					// implementations so we check for both just incase this changes
+					// in the future. 
+					if strings.Contains(strings.ToLower(d.DeviceRF.Manufacturer), "mellanox") ||
+					   strings.Contains(strings.ToLower(d.DeviceRF.Manufacturer), "hpe") ||
+					   strings.Contains(strings.ToLower(d.DeviceRF.Manufacturer), "bei") {
+						dsOIDs = append(dsOIDs, oid)
+					}
+				} else {
+					dsOIDs = append(dsOIDs, oid)
+				}
 			}
 		}
 		//sort the OIDs

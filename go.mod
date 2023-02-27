@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/Cray-HPE/hms-sls v1.19.0
-	github.com/Cray-HPE/hms-smd v1.30.9
+	github.com/Cray-HPE/hms-smd v1.62.0
 	github.com/gin-gonic/gin v1.7.2
 	github.com/hashicorp/go-retryablehttp v0.7.0
 	github.com/joeig/go-powerdns/v2 v2.4.1

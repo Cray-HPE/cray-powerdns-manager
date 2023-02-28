@@ -24,6 +24,7 @@ package sls_common
 
 import (
 	"encoding/json"
+	"fmt"
 	"net"
 
 	"github.com/Cray-HPE/hms-xname/xnametypes"
@@ -47,6 +48,19 @@ type GenericHardware struct {
 }
 
 type GenericHardwareArray []GenericHardware
+
+func NewGenericHardware(xname string, class CabinetType, extraProperties interface{}) GenericHardware {
+	return GenericHardware{
+		Xname:              xnametypes.NormalizeHMSCompID(xname),
+		Class:              class,
+		ExtraPropertiesRaw: extraProperties,
+
+		// Calculate derived fields
+		Parent:     xnametypes.GetHMSCompParent(xname),
+		TypeString: xnametypes.GetHMSType(xname),
+		Type:       HMSTypeToHMSStringType(xnametypes.GetHMSType(xname)),
+	}
+}
 
 /*
 GetParent returns the string xname of the parent of this object.
@@ -127,6 +141,8 @@ ComptypeCabinet represents an object of type comptype_cabinet.
     },
 */
 type ComptypeCabinet struct {
+	Model string `json:"Model,omitempty"`
+
 	// Networks has at the top the hardware type, then inside of that the network ID, then inside of that the object.
 	Networks          map[string]map[string]CabinetNetworks
 	DHCPRelaySwitches []string `json:",omitempty"`
@@ -350,6 +366,29 @@ type NetworkExtraProperties struct {
 	SystemDefaultRoute string       `json:"SystemDefaultRoute,omitempty"`
 }
 
+// LookupSubnet returns a subnet by name
+func (network *NetworkExtraProperties) LookupSubnet(name string) (IPV4Subnet, int, error) {
+	var found []IPV4Subnet
+	if len(network.Subnets) == 0 {
+		return IPV4Subnet{}, 0, fmt.Errorf("subnet not found (%v)", name)
+	}
+	var index int
+	for i, v := range network.Subnets {
+		if v.Name == name {
+			index = i
+			found = append(found, v)
+		}
+	}
+	if len(found) == 1 {
+		// The Index is valid since, only one match was found!
+		return found[0], index, nil
+	}
+	if len(found) > 1 {
+		return found[0], 0, fmt.Errorf("found %v subnets instead of just one", len(found))
+	}
+	return IPV4Subnet{}, 0, fmt.Errorf("subnet not found (%v)", name)
+}
+
 // IPReservation is a type for managing IP Reservations
 type IPReservation struct {
 	Name      string   `json:"Name"`
@@ -375,15 +414,13 @@ type IPV4Subnet struct {
 	MetalLBPoolName  string          `json:"MetalLBPoolName,omitempty"`
 }
 
-type NetworkArray []Network
-
-// SLSGeneratorInputState is given to the SLS config generator in order to generator the SLS config file
-type SLSGeneratorInputState struct {
-	ManagementSwitches  map[string]GenericHardware `json:"ManagementSwitches"` // SLS Type: comptype_mgmt_switch
-	RiverCabinets       map[string]GenericHardware `json:"RiverCabinets"`      // SLS Type: comptype_cabinet
-	HillCabinets        map[string]GenericHardware `json:"HillCabinets"`       // SLS Type: comptype_cabinet
-	MountainCabinets    map[string]GenericHardware `json:"MountainCabinets"`   // SLS Type: comptype_cabinet
-	MountainStartingNid int                        `json:"MountainStartingNid"`
-
-	Networks map[string]Network `json:"Networks"`
+// ReservationsByName presents the IPReservations in a map by name
+func (subnet *IPV4Subnet) ReservationsByName() map[string]IPReservation {
+	reservations := make(map[string]IPReservation)
+	for _, v := range subnet.IPReservations {
+		reservations[v.Name] = v
+	}
+	return reservations
 }
+
+type NetworkArray []Network

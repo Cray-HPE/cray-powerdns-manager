@@ -57,7 +57,9 @@ func ensureMasterZone(zoneName string, nameserverFQDNs []string, rrSets []powerd
 				var tsigKeyIDs []string
 				for _, key := range DNSKeys {
 					if strings.TrimSuffix(zoneName, ".") == key.Name {
-						customDNSSECKey = &key
+						// Required because the loop variable itself is a reference.
+						tmpKey := key
+						customDNSSECKey = &tmpKey
 					}
 					if key.Type == common.TSIGKeyType {
 						tsigKeyIDs = append(tsigKeyIDs, key.Name)
@@ -67,7 +69,7 @@ func ensureMasterZone(zoneName string, nameserverFQDNs []string, rrSets []powerd
 				zone := &powerdns.Zone{
 					Name:             &zoneName,
 					Kind:             powerdns.ZoneKindPtr(powerdns.MasterZoneKind),
-					DNSsec:           powerdns.Bool(customDNSSECKey == nil),
+					DNSsec:           powerdns.Bool(false),
 					Nameservers:      nameserverFQDNs,
 					RRsets:           rrSets,
 					MasterTSIGKeyIDs: tsigKeyIDs,
@@ -215,7 +217,9 @@ networks:
 						var tsigKeyIDs []string
 						for _, key := range DNSKeys {
 							if strings.TrimSuffix(reverseZoneName, ".") == key.Name {
-								customDNSSECKey = &key
+								// Required because the loop variable itself is a reference.
+								tmpKey := key
+								customDNSSECKey = &tmpKey
 							}
 							if key.Type == common.TSIGKeyType {
 								tsigKeyIDs = append(tsigKeyIDs, key.Name)
@@ -225,7 +229,7 @@ networks:
 						reverseZone = &powerdns.Zone{
 							Name:             &reverseZoneName,
 							Kind:             powerdns.ZoneKindPtr(powerdns.MasterZoneKind),
-							DNSsec:           powerdns.Bool(true),
+							DNSsec:           powerdns.Bool(false),
 							Nameservers:      nameserverFQDNs,
 							MasterTSIGKeyIDs: tsigKeyIDs,
 						}
@@ -612,9 +616,9 @@ func buildDynamicForwardRRsets(hardware []sls_common.GenericHardware, networks [
 
 // trueUpRRSets verifies all of the RRsets for the zone are as they should be.
 // There are a total of 3 possibilities for each RRset:
-//	1) The RRset doesn't exist at all.
-//	2) The RRset exists but the records are not correct.
-//  3) The RRset exists and shouldn't.
+//  1. The RRset doesn't exist at all.
+//  2. The RRset exists but the records are not correct.
+//  3. The RRset exists and shouldn't.
 func trueUpRRSets(rrsets []powerdns.RRset, zones []*powerdns.Zone) (didSomething bool) {
 	// Main data structure to keep track of the RRsets we actually need to patch with the zone it should be added to.
 	actionableRRSetMap := make(map[string]*powerdns.RRsets)

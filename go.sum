@@ -42,6 +42,7 @@ github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym
 github.com/ClickHouse/clickhouse-go v1.3.12/go.mod h1:EaI/sW7Azgz9UATzd5ZdZHRUhHgv5+JMS9NSr2smCJI=
 github.com/Cray-HPE/hms-base v1.15.0 h1:VaQj6cY9OAs6rcD1miE133eqQnRTkEcX1lnwJA/SUuU=
 github.com/Cray-HPE/hms-base v1.15.0/go.mod h1:+G8KFLPtanLC5lQ602hrf3MDfLTmIXedTavVCOdz5XA=
+github.com/Cray-HPE/hms-base/v2 v2.0.1/go.mod h1:Mq+Ao3q4YtNZJZ1ly9wnEIKyvc3+QaA1B/xpiUpyhzQ=
 github.com/Cray-HPE/hms-certs v1.3.2 h1:Prd7PTwiSMULYuL8bhsvw7LSICx+pSvpWlA9fQKvW9s=
 github.com/Cray-HPE/hms-certs v1.3.2/go.mod h1:6DymilWScLtbQkaQRMuf55K1MzEi0kYCoXfT212yLjY=
 github.com/Cray-HPE/hms-compcredentials v1.11.2/go.mod h1:tmurR+zsOtB61n6j3GlEfsl7wmNIAGJqErFymOUb0Hw=
@@ -50,12 +51,12 @@ github.com/Cray-HPE/hms-msgbus v1.11.0/go.mod h1:cxn+lUOq3tpY3+KdFml6L56ZQo8sqN2
 github.com/Cray-HPE/hms-s3 v1.9.2/go.mod h1:p5pVsMDeOdXKssd9qyFtXo4ztrn2lhD04nrO8+NOi7g=
 github.com/Cray-HPE/hms-securestorage v1.12.2 h1:H5n0i6ldzewd5p7PI2Hktr/+9cYfSCui+0367p2L6n8=
 github.com/Cray-HPE/hms-securestorage v1.12.2/go.mod h1:P4CMKqQVlx/lv+AdyEjNQubZw2FKNyo/IAtFNgQ3VuI=
-github.com/Cray-HPE/hms-sls v1.19.0 h1:o6YECLm7yUR6MCD2jCO1ZFRC/1EqUf8HWQ+WdkJuaF8=
-github.com/Cray-HPE/hms-sls v1.19.0/go.mod h1:CbBCBXEhoJyWCGahFajUgDcqOtAnbIY+Atl8WITz3L8=
+github.com/Cray-HPE/hms-sls v1.29.0 h1:HK4H1ooB86Zau0o6DDLUqnnMvt9H/bVht7BfQep3NcQ=
+github.com/Cray-HPE/hms-sls v1.29.0/go.mod h1:XKGw18eCGS3oJwsYpw8B+QzNUhgHXLnbr2kgNUNUYrg=
 github.com/Cray-HPE/hms-smd v1.62.0 h1:umcPT6w31hO7nF3v8rIUEQP2G4al47rR8cM+eQasaWM=
 github.com/Cray-HPE/hms-smd v1.62.0/go.mod h1:7J7taeRXmceyLPHdKlLbucb10lqTrJxTUo3RhaTGMhs=
-github.com/Cray-HPE/hms-xname v1.0.1 h1:ChEuUoYhsWXBmjZzWtDS+zHlmehpyixSB7UW5M58pUo=
-github.com/Cray-HPE/hms-xname v1.0.1/go.mod h1:3A70QF0ddmkt/nz0jis5o8UIB4zAmsgsUiN71dr97n4=
+github.com/Cray-HPE/hms-xname v1.1.0 h1:y/JEM2PbBaD8VbU7u85+/YIugf1Evji59z5IeSffeO8=
+github.com/Cray-HPE/hms-xname v1.1.0/go.mod h1:3A70QF0ddmkt/nz0jis5o8UIB4zAmsgsUiN71dr97n4=
 github.com/DATA-DOG/go-sqlmock v1.3.3/go.mod h1:f/Ixk793poVmq4qj/V1dPUg2JEAKC73Q5eFN3EC/SaM=
 github.com/DataDog/datadog-go v3.2.0+incompatible/go.mod h1:LButxg5PwREeZtORoXG3tL4fMGNddJ+vMq1mwgfaqoQ=
 github.com/Masterminds/squirrel v1.4.0/go.mod h1:yaPeOnPG5ZRwL9oKdTsO/prlkPbXWZlRVMQ/gGlzIuA=
@@ -291,10 +292,10 @@ github.com/hashicorp/go-multierror v1.1.1/go.mod h1:iw975J/qwKPdAO1clOe2L8331t/9
 github.com/hashicorp/go-plugin v1.0.1/go.mod h1:++UyYGoz3o5w9ZzAdZxtQKrWWP+iqPBn3cQptSMzBuY=
 github.com/hashicorp/go-retryablehttp v0.5.3/go.mod h1:9B5zBasrRhHXnJnui7y6sL7es7NDiJgTc6Er0maI1Xs=
 github.com/hashicorp/go-retryablehttp v0.5.4/go.mod h1:9B5zBasrRhHXnJnui7y6sL7es7NDiJgTc6Er0maI1Xs=
-github.com/hashicorp/go-retryablehttp v0.6.0/go.mod h1:EM1UNuajSSS84RdcM8GK0q0UIPtYqPHVLu9oE2Wm8FY=
 github.com/hashicorp/go-retryablehttp v0.6.2/go.mod h1:gEx6HMUGxYYhJScX7W1Il64m6cc2C1mDaW3NQ9sY1FY=
 github.com/hashicorp/go-retryablehttp v0.6.6/go.mod h1:vAew36LZh98gCBJNLH42IQ1ER/9wtLZZ8meHqQvEYWY=
 github.com/hashicorp/go-retryablehttp v0.7.0/go.mod h1:vAew36LZh98gCBJNLH42IQ1ER/9wtLZZ8meHqQvEYWY=
+github.com/hashicorp/go-retryablehttp v0.7.1/go.mod h1:vAew36LZh98gCBJNLH42IQ1ER/9wtLZZ8meHqQvEYWY=
 github.com/hashicorp/go-retryablehttp v0.7.2 h1:AcYqCvkpalPnPF2pn0KamgwamS42TqUDDYFRKq/RAd0=
 github.com/hashicorp/go-retryablehttp v0.7.2/go.mod h1:Jy/gPYAdjqffZ/yFGCFV2doI5wjtH1ewM9u8iYVjtX8=
 github.com/hashicorp/go-rootcerts v1.0.1/go.mod h1:pqUvnprVnM5bf7AOirdbb01K4ccR319Vf4pU3K5EGc8=

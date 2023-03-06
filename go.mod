@@ -8,7 +8,7 @@ require (
 	github.com/gin-gonic/gin v1.9.0
 	github.com/hashicorp/go-retryablehttp v0.7.2
 	github.com/joeig/go-powerdns/v2 v2.4.1
-	github.com/mitchellh/mapstructure v1.4.1
+	github.com/mitchellh/mapstructure v1.5.0
 	github.com/namsral/flag v1.7.4-pre
 	github.com/xlab/treeprint v1.1.0
 	go.uber.org/zap v1.24.0

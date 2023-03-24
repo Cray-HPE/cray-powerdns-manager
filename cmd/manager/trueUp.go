@@ -117,6 +117,9 @@ func trueUpMasterZones(baseDomain string, networks []sls_common.Network,
 		fullDomain := fmt.Sprintf("%s.%s", networkDomain, baseDomain)
 
 		masterZoneNames = append(masterZoneNames, fullDomain)
+		if *createDNAME == true {
+			masterZoneNames = append(masterZoneNames, networkDomain)
+		}
 	}
 
 	// Every zone should have at least the master nameserver.
@@ -131,6 +134,19 @@ func trueUpMasterZones(baseDomain string, networks []sls_common.Network,
 		// the A record of the master server otherwise it won't let us create the zone.
 		if masterZoneName == baseDomain {
 			nameserverRRSets = append(nameserverRRSets, masterNameserverRRSet)
+		}
+
+		// This is a short zone that requires a DNAME pointer to the fully qualified zone
+		if !strings.HasSuffix(masterZoneName, baseDomain) && *createDNAME == true {
+			logger.Debug("Found short zone name, creating DNAME record", zap.String("masterZoneName", masterZoneName))
+			dnameRRSet, err := common.GetDNAMERRSet(masterZoneName, baseDomain, masterZoneNames)
+			if err == nil {
+				logger.Debug("Adding DNAME RRSet to zone", zap.Any("RRSet", dnameRRSet))
+				nameserverRRSets = append(nameserverRRSets, dnameRRSet)
+			} else {
+				logger.Error("Cannot find fully qualified domain for short name. Unable to create DNAME record",
+					zap.String("masterZoneName", masterZoneName))
+			}
 		}
 
 		// Now figure out if this zone is enabled for zone transfers and if so add the slave server(s) to the

@@ -202,6 +202,29 @@ func GetNameserverRRset(nameserver Nameserver) powerdns.RRset {
 	}
 }
 
+func GetDNAMERRSet(masterZoneName string, baseDomain string, masterZoneNames []string) (rrSet powerdns.RRset, err error) {
+	for _, zone := range masterZoneNames {
+		if strings.HasPrefix(zone, masterZoneName) && strings.HasSuffix(zone, baseDomain) {
+
+			rrSet = powerdns.RRset{
+				Name:       powerdns.String(MakeDomainCanonical(masterZoneName)),
+				Type:       powerdns.RRTypePtr(powerdns.RRTypeDNAME),
+				TTL:        powerdns.Uint32(3600),
+				ChangeType: powerdns.ChangeTypePtr(powerdns.ChangeTypeReplace),
+				Records: []powerdns.Record{
+					{
+						Content:  powerdns.String(MakeDomainCanonical(zone)),
+						Disabled: powerdns.Bool(false),
+					},
+				},
+			}
+			return
+		}
+	}
+	err = fmt.Errorf("Did not find fully qualified domain for short name: %s", masterZoneName)
+	return
+}
+
 func SliceContains(needle string, haystack []string) bool {
 	for _, match := range haystack {
 		if needle == match {

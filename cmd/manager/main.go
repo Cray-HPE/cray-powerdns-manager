@@ -71,6 +71,9 @@ var (
 	ignoreSLSNetworks = flag.String("sls_ignore", "BICAN",
 		"Comma separated list of SLS networks to ignore, should always include BICAN")
 
+	createDNAME = flag.Bool("create_dname", true,
+		"Create short zones and DNAME records pointing to fully qualified zones")
+
 	router *gin.Engine
 
 	pdns *powerdns.Client

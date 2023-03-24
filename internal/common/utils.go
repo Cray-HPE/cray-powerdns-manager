@@ -204,7 +204,7 @@ func GetNameserverRRset(nameserver Nameserver) powerdns.RRset {
 
 func GetDNAMERRSet(masterZoneName string, baseDomain string, masterZoneNames []string) (rrSet powerdns.RRset, err error) {
 	for _, zone := range masterZoneNames {
-		if strings.HasPrefix(MakeDomainCanonical(zone), masterZoneName) && strings.HasSuffix(zone, baseDomain) {
+		if strings.HasPrefix(zone, MakeDomainCanonical(masterZoneName)) && strings.HasSuffix(zone, baseDomain) {
 
 			rrSet = powerdns.RRset{
 				Name:       powerdns.String(MakeDomainCanonical(masterZoneName)),

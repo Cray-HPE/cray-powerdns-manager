@@ -225,6 +225,39 @@ func GetDNAMERRSet(masterZoneName string, baseDomain string, masterZoneNames []s
 	return
 }
 
+func GetStartOfAuthorityRRSet(zoneName string,
+	mname string,
+	rname string,
+	refresh string,
+	retry string,
+	expire string,
+	ttl string) powerdns.RRset {
+
+	// Generate a SOA record that has the correct nameserver name
+	soaString := fmt.Sprintf("%s %s %s %s %s %s %s",
+		mname,
+		rname,
+		"0", // Serial
+		refresh,
+		retry,
+		expire,
+		ttl,
+	)
+
+	return powerdns.RRset{
+		Name:       powerdns.String(MakeDomainCanonical(zoneName)),
+		Type:       powerdns.RRTypePtr(powerdns.RRTypeSOA),
+		TTL:        powerdns.Uint32(3600),
+		ChangeType: powerdns.ChangeTypePtr(powerdns.ChangeTypeReplace),
+		Records: []powerdns.Record{
+			{
+				Content:  powerdns.String(soaString),
+				Disabled: powerdns.Bool(false),
+			},
+		},
+	}
+}
+
 func SliceContains(needle string, haystack []string) bool {
 	for _, match := range haystack {
 		if needle == match {

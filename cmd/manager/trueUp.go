@@ -149,6 +149,18 @@ func trueUpMasterZones(baseDomain string, networks []sls_common.Network,
 			}
 		}
 
+               // Generate a SOA record that has the correct nameserver name
+		soa := common.GetStartOfAuthorityRRSet(masterZoneName,
+                       *masterNameserverRRSet.Name,
+                       fmt.Sprintf("hostmaster.%s.", masterZoneName),
+                       *soaRefresh,
+                       *soaRetry,
+                       *soaExpiry,
+                       *soaMinimum,
+               )
+
+               nameserverRRSets = append(nameserverRRSets, soa)
+
 		// Now figure out if this zone is enabled for zone transfers and if so add the slave server(s) to the
 		// name server list.
 		if len(notifyZonesArray) == 0 || common.SliceContains(masterZoneName, notifyZonesArray) {

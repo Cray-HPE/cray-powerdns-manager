@@ -4,8 +4,8 @@ on:
     branches:
       - master
       - release/**
-  schedule:
-    - cron: '33 19 * * *'
+  # schedule:
+  #   - cron: '33 19 * * *'
   workflow_dispatch:
 jobs:
   lint-test-scan:
@@ -17,3 +17,6 @@ jobs:
       #scan-image-snyk-args: "--severity-threshold=high"
     secrets:
       snyk-token: ${{ secrets.SNYK_TOKEN }}
+      github-token: ${{ secrets.GITHUB_TOKEN }}
+      artifactory-username: ${{ secrets.ARTIFACTORY_ALGOL60_READONLY_USERNAME }}
+      artifactory-password: ${{ secrets.ARTIFACTORY_ALGOL60_READONLY_TOKEN }}

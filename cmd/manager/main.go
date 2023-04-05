@@ -71,6 +71,18 @@ var (
 	ignoreSLSNetworks = flag.String("sls_ignore", "BICAN",
 		"Comma separated list of SLS networks to ignore, should always include BICAN")
 
+	createDNAME = flag.Bool("create_dname", true,
+		"Create short zones and DNAME records pointing to fully qualified zones")
+
+        soaRefresh = flag.String("soa_refresh", "10800",
+                "The number of seconds before the zone should be refreshed")
+        soaRetry = flag.String("soa_retry", "3600",
+                "The number of seconds before a failed refresh should be retried")
+        soaExpiry = flag.String("soa_expiry", "604800",
+                "The upper limit in seconds before a zone is considered no longer authoritative")
+        soaMinimum = flag.String("soa_minimum", "3600",
+                "The negative result TTL")
+
 	router *gin.Engine
 
 	pdns *powerdns.Client

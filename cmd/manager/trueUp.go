@@ -117,6 +117,9 @@ func trueUpMasterZones(baseDomain string, networks []sls_common.Network,
 		fullDomain := fmt.Sprintf("%s.%s", networkDomain, baseDomain)
 
 		masterZoneNames = append(masterZoneNames, fullDomain)
+		if *createDNAME == true {
+			masterZoneNames = append(masterZoneNames, networkDomain)
+		}
 	}
 
 	// Every zone should have at least the master nameserver.
@@ -132,6 +135,31 @@ func trueUpMasterZones(baseDomain string, networks []sls_common.Network,
 		if masterZoneName == baseDomain {
 			nameserverRRSets = append(nameserverRRSets, masterNameserverRRSet)
 		}
+
+		// This is a short zone that requires a DNAME pointer to the fully qualified zone
+		if !strings.HasSuffix(masterZoneName, baseDomain) && *createDNAME == true {
+			logger.Debug("Found short zone name, creating DNAME record", zap.String("masterZoneName", masterZoneName))
+			dnameRRSet, err := common.GetDNAMERRSet(masterZoneName, baseDomain, masterZoneNames)
+			if err == nil {
+				logger.Debug("Adding DNAME RRSet to zone", zap.Any("RRSet", dnameRRSet))
+				nameserverRRSets = append(nameserverRRSets, dnameRRSet)
+			} else {
+				logger.Error("Cannot find fully qualified domain for short name. Unable to create DNAME record",
+					zap.String("masterZoneName", masterZoneName))
+			}
+		}
+
+               // Generate a SOA record that has the correct nameserver name
+		soa := common.GetStartOfAuthorityRRSet(masterZoneName,
+                       *masterNameserverRRSet.Name,
+                       fmt.Sprintf("hostmaster.%s.", masterZoneName),
+                       *soaRefresh,
+                       *soaRetry,
+                       *soaExpiry,
+                       *soaMinimum,
+               )
+
+               nameserverRRSets = append(nameserverRRSets, soa)
 
 		// Now figure out if this zone is enabled for zone transfers and if so add the slave server(s) to the
 		// name server list.

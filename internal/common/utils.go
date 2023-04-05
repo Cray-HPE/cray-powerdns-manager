@@ -202,6 +202,62 @@ func GetNameserverRRset(nameserver Nameserver) powerdns.RRset {
 	}
 }
 
+func GetDNAMERRSet(masterZoneName string, baseDomain string, masterZoneNames []string) (rrSet powerdns.RRset, err error) {
+	for _, zone := range masterZoneNames {
+		if strings.HasPrefix(zone, MakeDomainCanonical(masterZoneName)) && strings.HasSuffix(zone, baseDomain) {
+
+			rrSet = powerdns.RRset{
+				Name:       powerdns.String(MakeDomainCanonical(masterZoneName)),
+				Type:       powerdns.RRTypePtr(powerdns.RRTypeDNAME),
+				TTL:        powerdns.Uint32(3600),
+				ChangeType: powerdns.ChangeTypePtr(powerdns.ChangeTypeReplace),
+				Records: []powerdns.Record{
+					{
+						Content:  powerdns.String(MakeDomainCanonical(zone)),
+						Disabled: powerdns.Bool(false),
+					},
+				},
+			}
+			return
+		}
+	}
+	err = fmt.Errorf("Did not find fully qualified domain for short name: %s", masterZoneName)
+	return
+}
+
+func GetStartOfAuthorityRRSet(zoneName string,
+	mname string,
+	rname string,
+	refresh string,
+	retry string,
+	expire string,
+	ttl string) powerdns.RRset {
+
+	// Generate a SOA record that has the correct nameserver name
+	soaString := fmt.Sprintf("%s %s %s %s %s %s %s",
+		mname,
+		rname,
+		"0", // Serial
+		refresh,
+		retry,
+		expire,
+		ttl,
+	)
+
+	return powerdns.RRset{
+		Name:       powerdns.String(MakeDomainCanonical(zoneName)),
+		Type:       powerdns.RRTypePtr(powerdns.RRTypeSOA),
+		TTL:        powerdns.Uint32(3600),
+		ChangeType: powerdns.ChangeTypePtr(powerdns.ChangeTypeReplace),
+		Records: []powerdns.Record{
+			{
+				Content:  powerdns.String(soaString),
+				Disabled: powerdns.Bool(false),
+			},
+		},
+	}
+}
+
 func SliceContains(needle string, haystack []string) bool {
 	for _, match := range haystack {
 		if needle == match {

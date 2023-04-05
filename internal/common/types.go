@@ -21,7 +21,8 @@ type NetworkNameCIDRMap struct {
 type PowerDNSZones []*powerdns.Zone
 
 type DNSKeyType int
-const(
+
+const (
 	DNSSecKeyType = iota
 	TSIGKeyType
 )

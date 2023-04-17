@@ -10,7 +10,7 @@ require (
 	github.com/joeig/go-powerdns/v2 v2.4.1
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/namsral/flag v1.7.4-pre
-	github.com/xlab/treeprint v1.1.0
+	github.com/xlab/treeprint v1.2.0
 	go.uber.org/zap v1.24.0
 )
 

@@ -37,6 +37,7 @@ import (
 	"sync"
 	"syscall"
 	"time"
+	"sort"
 
 	"github.com/Cray-HPE/cray-powerdns-manager/internal/common"
 	"github.com/Cray-HPE/cray-powerdns-manager/internal/httpLogger"
@@ -248,7 +249,7 @@ func doLoop() {
 		}
 
 		// create list of Zones
-		var allZones []*powerdns.Zone
+		var allZones common.PowerDNSZones
 		for _, zone := range zones {
 			zone, err := pdns.Zones.Get(*zone.Name)
 			if err != nil {
@@ -256,6 +257,10 @@ func doLoop() {
 			}
 			allZones = append(allZones, zone)
 		}
+
+		// Need to pre-sort allZones to prevent GetZoneForRRSet from clobbering it as we
+		// iterate on it.
+		sort.Sort(allZones)
 
 		// Make a map of zones -> zone RRSets to make lookup more efficient
 		// TODO: Phase out allZones in favour of this. Will require rewrite of GetZoneForRRSet and manager changes.

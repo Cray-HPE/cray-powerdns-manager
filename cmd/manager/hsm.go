@@ -26,8 +26,10 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/Cray-HPE/hms-base"
 	"github.com/Cray-HPE/hms-smd/pkg/sm"
 	"github.com/hashicorp/go-retryablehttp"
 	"io/ioutil"
@@ -54,6 +56,37 @@ func getHSMEthernetInterfaces() (ethernetInterfaces []sm.CompEthInterfaceV2, err
 
 	body, _ := ioutil.ReadAll(resp.Body)
 	err = json.Unmarshal(body, &ethernetInterfaces)
+	if err != nil {
+		err = fmt.Errorf("failed to unmarshal body: %w", err)
+	}
+
+	return
+}
+
+// getHSMNodeState returns a ComponentArray for all SMD objects of type "Node".
+func getHSMNodeState() (stateComponents base.ComponentArray, err error) {
+	url := fmt.Sprintf("%s/hsm/v2/State/Components", *hsmURL)
+	reqBody := bytes.NewReader([]byte("{'Type': 'Node'}"))
+	req, err := retryablehttp.NewRequest("GET", url, reqBody)
+
+	if err != nil {
+		err = fmt.Errorf("failed to create new request: %w", err)
+		return
+	}
+	if token != "" {
+		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
+	}
+	req = req.WithContext(ctx)
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		err = fmt.Errorf("failed to do request: %w", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	body, _ := ioutil.ReadAll(resp.Body)
+	err = json.Unmarshal(body, &stateComponents)
 	if err != nil {
 		err = fmt.Errorf("failed to unmarshal body: %w", err)
 	}

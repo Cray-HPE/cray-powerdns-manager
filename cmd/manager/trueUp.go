@@ -82,6 +82,11 @@ func ensureMasterZone(zoneName string, nameserverFQDNs []string, rrSets []powerd
 					return
 				} else {
 					logger.Info("Added master zone", zap.String("zoneName", zoneName))
+					// Rectify the zone to ensure all DNSSEC data is correct
+					_, err = pdns.Zones.Rectify(zoneName)
+					if err != nil {
+						logger.Error("Failed to rectify zone", zap.String("zoneName", zoneName), zap.Error(err))
+					}
 
 					// Now that the zone is added we check to see if we found a custom DNSSEC key and if so upload that.
 					if customDNSSECKey != nil {
@@ -134,6 +139,31 @@ func trueUpMasterZones(baseDomain string, networks []sls_common.Network,
 		// the A record of the master server otherwise it won't let us create the zone.
 		if masterZoneName == baseDomain {
 			nameserverRRSets = append(nameserverRRSets, masterNameserverRRSet)
+
+			// Add the subdomain delegation NS records to the TLD.
+			for _, zone := range masterZoneNames {
+				if zone == baseDomain {
+					continue
+				}
+
+				// Don't want to include any of the DNAME zones
+				if strings.HasSuffix(zone, baseDomain) {
+					logger.Debug("Add NS records", zap.Any("masterZoneName", zone))
+					ns := powerdns.RRset{
+						Name:       powerdns.String(common.MakeDomainCanonical(zone)),
+						Type:       powerdns.RRTypePtr(powerdns.RRTypeNS),
+						TTL:        powerdns.Uint32(3600),
+						ChangeType: powerdns.ChangeTypePtr(powerdns.ChangeTypeReplace),
+						Records: []powerdns.Record{
+							{
+								Content:  powerdns.String(common.MakeDomainCanonical(masterNameserver.FQDN)),
+								Disabled: powerdns.Bool(false),
+							},
+						},
+					}
+					nameserverRRSets = append(nameserverRRSets, ns)
+				}
+			}
 		}
 
 		// This is a short zone that requires a DNAME pointer to the fully qualified zone
@@ -149,17 +179,17 @@ func trueUpMasterZones(baseDomain string, networks []sls_common.Network,
 			}
 		}
 
-               // Generate a SOA record that has the correct nameserver name
+		// Generate a SOA record that has the correct nameserver name
 		soa := common.GetStartOfAuthorityRRSet(masterZoneName,
-                       *masterNameserverRRSet.Name,
-                       fmt.Sprintf("hostmaster.%s.", masterZoneName),
-                       *soaRefresh,
-                       *soaRetry,
-                       *soaExpiry,
-                       *soaMinimum,
-               )
+			*masterNameserverRRSet.Name,
+			fmt.Sprintf("hostmaster.%s.", masterZoneName),
+			*soaRefresh,
+			*soaRetry,
+			*soaExpiry,
+			*soaMinimum,
+		)
 
-               nameserverRRSets = append(nameserverRRSets, soa)
+		nameserverRRSets = append(nameserverRRSets, soa)
 
 		// Now figure out if this zone is enabled for zone transfers and if so add the slave server(s) to the
 		// name server list.
@@ -215,7 +245,17 @@ networks:
 			// This master name server is always listed as one of the nameservers.
 			masterNameserverRRSet := common.GetNameserverRRset(masterNameserver)
 			nameserverFQDNs = append(nameserverFQDNs, *masterNameserverRRSet.Name)
-			nameserverRRSets = append(nameserverRRSets, masterNameserverRRSet)
+
+			// Build valid SOA record
+			soa := common.GetStartOfAuthorityRRSet(reverseZoneName,
+				*masterNameserverRRSet.Name,
+				fmt.Sprintf("hostmaster.%s", common.MakeDomainCanonical(*baseDomain)),
+				*soaRefresh,
+				*soaRetry,
+				*soaExpiry,
+				*soaMinimum,
+			)
+			nameserverRRSets = append(nameserverRRSets, soa)
 
 			// Now figure out if this zone is enabled for zone transfers and if so add the slave server(s) to the
 			// name server list.
@@ -224,7 +264,6 @@ networks:
 					nameserverRRSet := common.GetNameserverRRset(nameserver)
 
 					nameserverFQDNs = append(nameserverFQDNs, *nameserverRRSet.Name)
-					nameserverRRSets = append(nameserverRRSets, nameserverRRSet)
 				}
 			}
 
@@ -260,6 +299,7 @@ networks:
 							DNSsec:           powerdns.Bool(false),
 							Nameservers:      nameserverFQDNs,
 							MasterTSIGKeyIDs: tsigKeyIDs,
+							RRsets:           nameserverRRSets,
 						}
 						reverseZone, err = pdns.Zones.Add(reverseZone)
 						if err != nil {

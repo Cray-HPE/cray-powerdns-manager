@@ -64,4 +64,4 @@ require (
 )
 
 // Temporary until I can get a PR opened to the parent project for the CryptoKey and TSIGKey support we need.
-replace github.com/joeig/go-powerdns/v2 => github.com/SeanWallace/go-powerdns/v2 v2.4.1-0.20210914015402-5c6aa3160920
+replace github.com/joeig/go-powerdns/v2 => github.com/spillerc-hpe/go-powerdns/v2 v2.4.2

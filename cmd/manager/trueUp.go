@@ -149,17 +149,17 @@ func trueUpMasterZones(baseDomain string, networks []sls_common.Network,
 			}
 		}
 
-               // Generate a SOA record that has the correct nameserver name
+		// Generate a SOA record that has the correct nameserver name
 		soa := common.GetStartOfAuthorityRRSet(masterZoneName,
-                       *masterNameserverRRSet.Name,
-                       fmt.Sprintf("hostmaster.%s.", masterZoneName),
-                       *soaRefresh,
-                       *soaRetry,
-                       *soaExpiry,
-                       *soaMinimum,
-               )
+			*masterNameserverRRSet.Name,
+			fmt.Sprintf("hostmaster.%s.", masterZoneName),
+			*soaRefresh,
+			*soaRetry,
+			*soaExpiry,
+			*soaMinimum,
+		)
 
-               nameserverRRSets = append(nameserverRRSets, soa)
+		nameserverRRSets = append(nameserverRRSets, soa)
 
 		// Now figure out if this zone is enabled for zone transfers and if so add the slave server(s) to the
 		// name server list.
@@ -215,7 +215,17 @@ networks:
 			// This master name server is always listed as one of the nameservers.
 			masterNameserverRRSet := common.GetNameserverRRset(masterNameserver)
 			nameserverFQDNs = append(nameserverFQDNs, *masterNameserverRRSet.Name)
-			nameserverRRSets = append(nameserverRRSets, masterNameserverRRSet)
+
+			// Build valid SOA record
+			soa := common.GetStartOfAuthorityRRSet(reverseZoneName,
+				*masterNameserverRRSet.Name,
+				fmt.Sprintf("hostmaster.%s", common.MakeDomainCanonical(*baseDomain)),
+				*soaRefresh,
+				*soaRetry,
+				*soaExpiry,
+				*soaMinimum,
+			)
+			nameserverRRSets = append(nameserverRRSets, soa)
 
 			// Now figure out if this zone is enabled for zone transfers and if so add the slave server(s) to the
 			// name server list.
@@ -224,7 +234,6 @@ networks:
 					nameserverRRSet := common.GetNameserverRRset(nameserver)
 
 					nameserverFQDNs = append(nameserverFQDNs, *nameserverRRSet.Name)
-					nameserverRRSets = append(nameserverRRSets, nameserverRRSet)
 				}
 			}
 
@@ -260,6 +269,7 @@ networks:
 							DNSsec:           powerdns.Bool(false),
 							Nameservers:      nameserverFQDNs,
 							MasterTSIGKeyIDs: tsigKeyIDs,
+							RRsets:           nameserverRRSets,
 						}
 						reverseZone, err = pdns.Zones.Add(reverseZone)
 						if err != nil {

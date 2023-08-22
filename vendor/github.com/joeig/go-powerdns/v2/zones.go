@@ -38,6 +38,11 @@ type NotifyResult struct {
 	Result *string `json:"result,omitempty"`
 }
 
+// RectifyResult structure with JSON API metadata
+type RectifyResult struct {
+        Result *string `json:"result,omitempty"`
+}
+
 // Export string type
 type Export string
 
@@ -191,6 +196,18 @@ func (z *ZonesService) Notify(domain string) (*NotifyResult, error) {
 	notifyResult := &NotifyResult{}
 	_, err = z.client.do(req, notifyResult)
 	return notifyResult, err
+}
+
+// Rectify the zone data so it complies with DNSSEC settings.
+func (z *ZonesService) Rectify(domain string) (*RectifyResult, error) {
+        req, err := z.client.newRequest("PUT", fmt.Sprintf("servers/%s/zones/%s/rectify", z.client.VHost, trimDomain(domain)), nil, nil)
+        if err != nil {
+                return nil, err
+        }
+
+        rectifyResult := &RectifyResult{}
+        _, err = z.client.do(req, rectifyResult)
+        return rectifyResult, err
 }
 
 // Export returns a BIND-like Zone file

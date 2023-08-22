@@ -1,3 +1,2 @@
-chart-dirs:
-  - kubernetes
+chart-dirs: []
 chart-repos: []

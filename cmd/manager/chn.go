@@ -43,7 +43,6 @@ func getHSNNidNic(reservation string,
 							hasNid = true
 							hostname = fmt.Sprintf("%s%d", *nidPrefix, nid)
 							nic, _ = strconv.Atoi(matches[re.SubexpIndex("Nic")])
-							fmt.Println(hostname)
 						}
 					}
 

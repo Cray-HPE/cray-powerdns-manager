@@ -37,6 +37,7 @@ import (
 	"sync"
 	"syscall"
 	"time"
+	"sort"
 
 	"github.com/Cray-HPE/cray-powerdns-manager/internal/common"
 	"github.com/Cray-HPE/cray-powerdns-manager/internal/httpLogger"
@@ -81,11 +82,24 @@ var (
 func ProcessExternalDNSRecord(rrSet powerdns.RRset, zone *powerdns.Zone, allZones []*powerdns.Zone) (powerdns.RRset, powerdns.RRset, error) {
 	var rrSetReverse, rrSetTXT powerdns.RRset
 	var err error = nil
+	var recordName string
 
 	logger.Debug("ProcessExternalDNSRecord: Found ExternalDNS TXT record", zap.Any("txt", *rrSet.Name), zap.Any("content", *rrSet.Records[0].Content))
 
+	/* External DNS changed the format of their TXT records in version 0.12.
+	   The TXT record now contains a prefix indicating the record type e.g.
+	   a-foo.example.com which obviously no longer matches the corresponding A
+	   record.
+	*/
+	if strings.HasPrefix(*rrSet.Name, "a-") {
+		logger.Debug("Found new format registry record", zap.Any("rrSet", rrSet))
+		recordName = strings.TrimPrefix(*rrSet.Name, "a-")
+	} else {
+		recordName = *rrSet.Name
+	}
+
 	for _, name := range zone.RRsets {
-		if *name.Type == powerdns.RRTypeA && *name.Name == *rrSet.Name {
+		if *name.Type == powerdns.RRTypeA && *name.Name == recordName {
 			for _, record := range name.Records {
 				logger.Debug("Found corresponding A record", zap.Any("name", *name.Name), zap.Any("ip", *record.Content))
 
@@ -136,6 +150,11 @@ func ProcessExternalDNSRecord(rrSet powerdns.RRset, zone *powerdns.Zone, allZone
 				}
 			}
 		}
+	}
+	// Should not happen but return an error if unable to build a reverse RRSet
+	// instead of returning a null value.
+	if rrSetReverse.Records == nil {
+		err = fmt.Errorf("cannot find reverse zone")
 	}
 	return rrSetReverse, rrSetTXT, err
 }
@@ -196,10 +215,11 @@ func ProcessManagerRecord(rrSet powerdns.RRset, zone *powerdns.Zone, allZones []
 	return recordsToDelete, nil
 }
 
-/* There are three cases to consider here
-   1) An externaldns TXT record but has no corresponding PTR record - Create it
-   2) A PTR record exists with a cray-powerdns TXT record but no corresponding externaldns TXT record - Delete it
-   3) Both A and PTR records exist but the IPs do not match - Update it - The externaldns created record is *always* authoritative
+/*
+There are three cases to consider here
+ 1. An externaldns TXT record but has no corresponding PTR record - Create it
+ 2. A PTR record exists with a cray-powerdns TXT record but no corresponding externaldns TXT record - Delete it
+ 3. Both A and PTR records exist but the IPs do not match - Update it - The externaldns created record is *always* authoritative
 */
 func doLoop() {
 
@@ -229,7 +249,7 @@ func doLoop() {
 		}
 
 		// create list of Zones
-		var allZones []*powerdns.Zone
+		var allZones common.PowerDNSZones
 		for _, zone := range zones {
 			zone, err := pdns.Zones.Get(*zone.Name)
 			if err != nil {
@@ -237,6 +257,10 @@ func doLoop() {
 			}
 			allZones = append(allZones, zone)
 		}
+
+		// Need to pre-sort allZones to prevent GetZoneForRRSet from clobbering it as we
+		// iterate on it.
+		sort.Sort(allZones)
 
 		// Make a map of zones -> zone RRSets to make lookup more efficient
 		// TODO: Phase out allZones in favour of this. Will require rewrite of GetZoneForRRSet and manager changes.

@@ -301,6 +301,12 @@ func buildStaticForwardRRSets(networks []sls_common.Network, hardware []sls_comm
 		hardwareMap[device.Xname] = device
 	}
 
+	// Build up a map of the state data to avoid having to iterate through it for the HSN and CHN records.
+	stateMap := make(map[string]base.Component)
+	for _, node := range state.Components {
+		stateMap[node.ID] = *node
+	}
+
 	for _, network := range networks {
 		networkDomain := strings.ToLower(network.Name)
 
@@ -390,9 +396,9 @@ func buildStaticForwardRRSets(networks []sls_common.Network, hardware []sls_comm
 				case networkDomain == "hsn":
 					logger.Debug("Processing HSN network, should create extra stuff")
 					logger.Debug("HSN", zap.Any("reservation", reservation))
-					hostname, nic, e := getHSNNidNic(reservation.Name, hardwareMap)
+					hostname, nic, e := getHSNNidNic(reservation.Name, hardwareMap, stateMap)
 					if e != nil {
-						logger.Debug("Unable to determine hostname", zap.Any("error", e))
+						logger.Debug("HSN: Unable to determine hostname", zap.Any("error", e))
 						continue
 					}
 					hsnname := fmt.Sprintf("%s-hsn%d", hostname, nic)
@@ -431,9 +437,9 @@ func buildStaticForwardRRSets(networks []sls_common.Network, hardware []sls_comm
 						staticRRSets = append(staticRRSets, aliasRRset)
 					}
 				case networkDomain == "chn":
-					hostname, _, e := getHSNNidNic(reservation.Name, hardwareMap)
+					hostname, _, e := getHSNNidNic(reservation.Name, hardwareMap, stateMap)
 					if e != nil {
-						logger.Debug("Unable to determine hostname", zap.Any("error", e))
+						logger.Debug("CHN: Unable to determine hostname", zap.Any("error", e))
 						continue
 					}
 

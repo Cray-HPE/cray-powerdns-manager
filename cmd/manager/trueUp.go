@@ -33,6 +33,7 @@ import (
 	"time"
 
 	"github.com/Cray-HPE/cray-powerdns-manager/internal/common"
+	base "github.com/Cray-HPE/hms-base"
 	sls_common "github.com/Cray-HPE/hms-sls/pkg/sls-common"
 	"github.com/Cray-HPE/hms-smd/pkg/sm"
 	"github.com/joeig/go-powerdns/v2"
@@ -332,12 +333,18 @@ networks:
 	return
 }
 
-func buildStaticForwardRRSets(networks []sls_common.Network, hardware []sls_common.GenericHardware) (
+func buildStaticForwardRRSets(networks []sls_common.Network, hardware []sls_common.GenericHardware, state base.ComponentArray) (
 	staticRRSets []powerdns.RRset, err error) {
 	// Build up a map of the hardware to save lookup time later.
 	hardwareMap := make(map[string]sls_common.GenericHardware)
 	for _, device := range hardware {
 		hardwareMap[device.Xname] = device
+	}
+
+	// Build up a map of the state data to avoid having to iterate through it for the HSN and CHN records.
+	stateMap := make(map[string]base.Component)
+	for _, node := range state.Components {
+		stateMap[node.ID] = *node
 	}
 
 	for _, network := range networks {
@@ -421,6 +428,82 @@ func buildStaticForwardRRSets(networks []sls_common.Network, hardware []sls_comm
 						},
 					}
 					staticRRSets = append(staticRRSets, aliasRRset)
+				}
+				/*
+					Now create HSN/CHN specific nid aliases
+					nid000001.chn.<system domain>
+					nid000001.hsn.<system domain>
+					nid000001-hsn0.hsn.<system domain>
+				*/
+				switch {
+				case networkDomain == "hsn":
+					logger.Debug("Processing HSN network, create alias records")
+					hostname, nic, e := getHSNNidNic(reservation.Name, hardwareMap, stateMap)
+					if e != nil {
+						logger.Error("Unable to determine HSN NID alias", zap.Any("error", e))
+						continue
+					}
+					logger.Debug("Got alias and NIC data", zap.String("hostname", hostname), zap.Int("nic", nic))
+					hsnname := fmt.Sprintf("%s-hsn%d", hostname, nic)
+					logger.Debug("Create HSN NIC host alias", zap.Any("xname", reservation.Name), zap.Any("alias", hsnname))
+
+					aliasRRset := powerdns.RRset{
+						Name:       powerdns.String(fmt.Sprintf("%s.%s.%s.", hsnname, networkDomain, *baseDomain)),
+						Type:       powerdns.RRTypePtr(powerdns.RRTypeCNAME),
+						TTL:        powerdns.Uint32(3600),
+						ChangeType: powerdns.ChangeTypePtr(powerdns.ChangeTypeReplace),
+						Records: []powerdns.Record{
+							{
+								Content:  powerdns.String(primaryName),
+								Disabled: powerdns.Bool(false),
+							},
+						},
+					}
+					staticRRSets = append(staticRRSets, aliasRRset)
+
+					// If the HSN nic index is 0, create the extra nid record for the host
+					if nic == 0 {
+						logger.Debug("Create HSN host alias", zap.Any("hostname", hostname), zap.Int("nic", nic))
+
+						aliasRRset := powerdns.RRset{
+							Name:       powerdns.String(fmt.Sprintf("%s.%s.%s.", hostname, networkDomain, *baseDomain)),
+							Type:       powerdns.RRTypePtr(powerdns.RRTypeCNAME),
+							TTL:        powerdns.Uint32(3600),
+							ChangeType: powerdns.ChangeTypePtr(powerdns.ChangeTypeReplace),
+							Records: []powerdns.Record{
+								{
+									Content:  powerdns.String(primaryName),
+									Disabled: powerdns.Bool(false),
+								},
+							},
+						}
+						staticRRSets = append(staticRRSets, aliasRRset)
+					}
+				case networkDomain == "chn":
+					hostname, _, e := getHSNNidNic(reservation.Name, hardwareMap, stateMap)
+					if e != nil {
+						// This is logged at debug level rather than error because the CHN network
+						// has other aliases that aren't xnames (chn-switch-1, ncn-m001 etc.) that
+						// will cause the lookup to always fail resulting in a noisy log.
+						logger.Debug("Unable to determine CHN hostname", zap.Any("error", e))
+						continue
+					}
+					logger.Debug("Got CHN hostname", zap.String("hostname", hostname))
+
+					aliasRRset := powerdns.RRset{
+						Name:       powerdns.String(fmt.Sprintf("%s.%s.%s.", hostname, networkDomain, *baseDomain)),
+						Type:       powerdns.RRTypePtr(powerdns.RRTypeCNAME),
+						TTL:        powerdns.Uint32(3600),
+						ChangeType: powerdns.ChangeTypePtr(powerdns.ChangeTypeReplace),
+						Records: []powerdns.Record{
+							{
+								Content:  powerdns.String(primaryName),
+								Disabled: powerdns.Bool(false),
+							},
+						},
+					}
+					staticRRSets = append(staticRRSets, aliasRRset)
+
 				}
 			}
 		}
@@ -851,6 +934,13 @@ func trueUpDNS() {
 			continue
 		}
 
+		// Retrieve smd/v2/State/Components records. Necessary because the UAN NID is dynamically assigned by SMD.
+		stateComponents, err := getHSMNodeState()
+		if err != nil {
+			logger.Error("Failed to get component state from HSM!", zap.Error(err))
+			continue
+		}
+
 		// Build/get all necessary master zones.
 		masterZones := trueUpMasterZones(*baseDomain, networks, masterNameserver, slaveNameservers)
 
@@ -868,7 +958,7 @@ func trueUpDNS() {
 		// The PowerDNS API will not permit the submission of duplicates so drop entries
 		// that already exist in finalRRSet before passing to trueUpRRSets() to make the
 		// API call.
-		staticRRSets, err := buildStaticForwardRRSets(networks, hardware)
+		staticRRSets, err := buildStaticForwardRRSets(networks, hardware, stateComponents)
 		if err != nil {
 			logger.Error("Failed to build static RRsets!", zap.Error(err))
 		}

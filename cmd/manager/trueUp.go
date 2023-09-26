@@ -482,7 +482,10 @@ func buildStaticForwardRRSets(networks []sls_common.Network, hardware []sls_comm
 				case networkDomain == "chn":
 					hostname, _, e := getHSNNidNic(reservation.Name, hardwareMap, stateMap)
 					if e != nil {
-						logger.Error("Unable to determine CHN hostname", zap.Any("error", e))
+						// This is logged at debug level rather than error because the CHN network
+						// has other aliases that aren't xnames (chn-switch-1, ncn-m001 etc.) that
+						// will cause the lookup to always fail resulting in a noisy log.
+						logger.Debug("Unable to determine CHN hostname", zap.Any("error", e))
 						continue
 					}
 					logger.Debug("Got CHN hostname", zap.String("hostname", hostname))

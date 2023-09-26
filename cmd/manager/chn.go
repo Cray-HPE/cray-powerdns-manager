@@ -9,6 +9,11 @@ import (
 	"strconv"
 )
 
+// getHSNNidNic returns the NID alias (e.g. nid001000) for a given xname
+// and the HSN NIC number or an error if the NID cannot be determined.
+//
+// SLS is tried first however Application nodes are a special case as the
+// NID is assigned by SMD when the node is discovered.
 func getHSNNidNic(reservation string,
 	hardwareMap map[string]sls_common.GenericHardware,
 	stateMap map[string]base.Component) (hostname string, nic int, err error) {
@@ -26,18 +31,19 @@ func getHSNNidNic(reservation string,
 			var extraProperties sls_common.ComptypeNode
 			e := mapstructure.Decode(node.ExtraPropertiesRaw, &extraProperties)
 			if e != nil {
-				err = fmt.Errorf("Unable to decode node ExtraProperties")
+				err = fmt.Errorf("unable to decode node ExtraProperties")
 				return
 			} else {
 				// Try SLS first
 				if extraProperties.NID != 0 {
 					hasNid = true
+					// TODO: Make the zero padding configurable.
 					hostname = fmt.Sprintf("%s%06d", *nidPrefix, extraProperties.NID)
 					nic, _ = strconv.Atoi(matches[re.SubexpIndex("Nic")])
 				} else {
 					// Application nodes have the NID assigned by SMD, try there.
-					nodeState, found := stateMap[matches[xname]]
-					if found {
+					nodeState, foundSMD := stateMap[matches[xname]]
+					if foundSMD {
 						nid, err := nodeState.NID.Int64()
 						if err == nil {
 							hasNid = true
@@ -47,14 +53,15 @@ func getHSNNidNic(reservation string,
 					}
 
 				}
+				// Unable to find a NID in SLS or SMD
 				if hasNid == false {
-					err = fmt.Errorf("Unable to find NID for node %s in SLS hardware map", reservation)
+					err = fmt.Errorf("unable to find NID in SMD or SLS for node %s", reservation)
 					return
 				}
 			}
 		} else {
 			// Cannot find record in SLS hardware map
-			err = fmt.Errorf("Unable to find node %s in SLS hardware map", reservation)
+			err = fmt.Errorf("unable to find node %s in SLS hardware map", reservation)
 			return
 		}
 	} else {

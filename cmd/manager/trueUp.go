@@ -431,18 +431,21 @@ func buildStaticForwardRRSets(networks []sls_common.Network, hardware []sls_comm
 				}
 				/*
 					Now create HSN/CHN specific nid aliases
+					nid000001.chn.<system domain>
+					nid000001.hsn.<system domain>
+					nid000001-hsn0.hsn.<system domain>
 				*/
 				switch {
 				case networkDomain == "hsn":
-					logger.Debug("Processing HSN network, should create extra stuff")
-					logger.Debug("HSN", zap.Any("reservation", reservation))
+					logger.Debug("Processing HSN network, create alias records")
 					hostname, nic, e := getHSNNidNic(reservation.Name, hardwareMap, stateMap)
 					if e != nil {
-						logger.Debug("HSN: Unable to determine hostname", zap.Any("error", e))
+						logger.Error("Unable to determine HSN NID alias", zap.Any("error", e))
 						continue
 					}
+					logger.Debug("Got alias and NIC data", zap.String("hostname", hostname), zap.Int("nic", nic))
 					hsnname := fmt.Sprintf("%s-hsn%d", hostname, nic)
-					logger.Debug("Create HSN host alias", zap.Any("nidname", hsnname))
+					logger.Debug("Create HSN NIC host alias", zap.Any("xname", reservation.Name), zap.Any("alias", hsnname))
 
 					aliasRRset := powerdns.RRset{
 						Name:       powerdns.String(fmt.Sprintf("%s.%s.%s.", hsnname, networkDomain, *baseDomain)),
@@ -479,9 +482,10 @@ func buildStaticForwardRRSets(networks []sls_common.Network, hardware []sls_comm
 				case networkDomain == "chn":
 					hostname, _, e := getHSNNidNic(reservation.Name, hardwareMap, stateMap)
 					if e != nil {
-						logger.Debug("CHN: Unable to determine hostname", zap.Any("error", e))
+						logger.Error("Unable to determine CHN hostname", zap.Any("error", e))
 						continue
 					}
+					logger.Debug("Got CHN hostname", zap.String("hostname", hostname))
 
 					aliasRRset := powerdns.RRset{
 						Name:       powerdns.String(fmt.Sprintf("%s.%s.%s.", hostname, networkDomain, *baseDomain)),

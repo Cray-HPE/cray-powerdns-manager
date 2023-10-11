@@ -3,6 +3,7 @@ module github.com/Cray-HPE/cray-powerdns-manager
 go 1.19
 
 require (
+	github.com/Cray-HPE/hms-base v1.15.0
 	github.com/Cray-HPE/hms-sls v1.29.0
 	github.com/Cray-HPE/hms-smd v1.62.0
 	github.com/gin-gonic/gin v1.9.1
@@ -15,7 +16,6 @@ require (
 )
 
 require (
-	github.com/Cray-HPE/hms-base v1.15.0 // indirect
 	github.com/Cray-HPE/hms-certs v1.3.2 // indirect
 	github.com/Cray-HPE/hms-securestorage v1.12.2 // indirect
 	github.com/Cray-HPE/hms-xname v1.1.0 // indirect
@@ -53,10 +53,10 @@ require (
 	github.com/ugorji/go/codec v1.2.11 // indirect
 	go.uber.org/multierr v1.10.0 // indirect
 	golang.org/x/arch v0.3.0 // indirect
-	golang.org/x/crypto v0.9.0 // indirect
-	golang.org/x/net v0.10.0 // indirect
-	golang.org/x/sys v0.8.0 // indirect
-	golang.org/x/text v0.9.0 // indirect
+	golang.org/x/crypto v0.14.0 // indirect
+	golang.org/x/net v0.17.0 // indirect
+	golang.org/x/sys v0.13.0 // indirect
+	golang.org/x/text v0.13.0 // indirect
 	golang.org/x/time v0.0.0-20210611083556-38a9dc6acbc6 // indirect
 	google.golang.org/protobuf v1.30.0 // indirect
 	gopkg.in/square/go-jose.v2 v2.6.0 // indirect

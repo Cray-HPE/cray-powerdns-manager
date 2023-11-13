@@ -3,10 +3,11 @@ module github.com/Cray-HPE/cray-powerdns-manager
 go 1.19
 
 require (
+	github.com/Cray-HPE/hms-base v1.15.0
 	github.com/Cray-HPE/hms-sls v1.29.0
 	github.com/Cray-HPE/hms-smd v1.62.0
 	github.com/gin-gonic/gin v1.9.1
-	github.com/hashicorp/go-retryablehttp v0.7.4
+	github.com/hashicorp/go-retryablehttp v0.7.5
 	github.com/joeig/go-powerdns/v2 v2.4.1
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/namsral/flag v1.7.4-pre
@@ -15,7 +16,6 @@ require (
 )
 
 require (
-	github.com/Cray-HPE/hms-base v1.15.0 // indirect
 	github.com/Cray-HPE/hms-certs v1.3.2 // indirect
 	github.com/Cray-HPE/hms-securestorage v1.12.2 // indirect
 	github.com/Cray-HPE/hms-xname v1.1.0 // indirect

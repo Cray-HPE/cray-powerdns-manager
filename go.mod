@@ -3,7 +3,7 @@ module github.com/Cray-HPE/cray-powerdns-manager
 go 1.19
 
 require (
-	github.com/Cray-HPE/hms-base v1.15.0
+	github.com/Cray-HPE/hms-base v1.15.1
 	github.com/Cray-HPE/hms-sls v1.29.0
 	github.com/Cray-HPE/hms-smd v1.62.0
 	github.com/gin-gonic/gin v1.9.1

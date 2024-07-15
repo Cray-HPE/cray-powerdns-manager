@@ -40,8 +40,9 @@ github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78/go.mod h1:LmzpDX
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
 github.com/ClickHouse/clickhouse-go v1.3.12/go.mod h1:EaI/sW7Azgz9UATzd5ZdZHRUhHgv5+JMS9NSr2smCJI=
-github.com/Cray-HPE/hms-base v1.15.0 h1:VaQj6cY9OAs6rcD1miE133eqQnRTkEcX1lnwJA/SUuU=
 github.com/Cray-HPE/hms-base v1.15.0/go.mod h1:+G8KFLPtanLC5lQ602hrf3MDfLTmIXedTavVCOdz5XA=
+github.com/Cray-HPE/hms-base v1.15.1 h1:+f9cl9BsDWvewvGBPzinmBSU//I7yhwaSUTaNUwxwxQ=
+github.com/Cray-HPE/hms-base v1.15.1/go.mod h1:+G8KFLPtanLC5lQ602hrf3MDfLTmIXedTavVCOdz5XA=
 github.com/Cray-HPE/hms-base/v2 v2.0.1/go.mod h1:Mq+Ao3q4YtNZJZ1ly9wnEIKyvc3+QaA1B/xpiUpyhzQ=
 github.com/Cray-HPE/hms-certs v1.3.2 h1:Prd7PTwiSMULYuL8bhsvw7LSICx+pSvpWlA9fQKvW9s=
 github.com/Cray-HPE/hms-certs v1.3.2/go.mod h1:6DymilWScLtbQkaQRMuf55K1MzEi0kYCoXfT212yLjY=

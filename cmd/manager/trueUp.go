@@ -41,6 +41,25 @@ import (
 	"go.uber.org/zap"
 )
 
+// addOwnershipComment adds the manager ownership comment to an RRset
+func addOwnershipComment(rrset *powerdns.RRset) {
+	rrset.Comments = []powerdns.Comment{
+		{
+			Content: powerdns.String(ManagerOwnershipComment),
+		},
+	}
+}
+
+// isOwnedByManager checks if an RRset has the manager ownership comment
+func isOwnedByManager(rrset powerdns.RRset) bool {
+	for _, comment := range rrset.Comments {
+		if comment.Content != nil && *comment.Content == ManagerOwnershipComment {
+			return true
+		}
+	}
+	return false
+}
+
 func ensureMasterZone(zoneName string, nameserverFQDNs []string, rrSets []powerdns.RRset) (masterZone *powerdns.Zone) {
 	var err error
 	masterZone, err = pdns.Zones.Get(zoneName)
@@ -384,6 +403,7 @@ func buildStaticForwardRRSets(networks []sls_common.Network, hardware []sls_comm
 							},
 						},
 					}
+					addOwnershipComment(&nameRRset)
 					staticRRSets = append(staticRRSets, nameRRset)
 				} else {
 					primaryName = fmt.Sprintf("%s.%s.%s.", reservation.Name, networkDomain, *baseDomain)
@@ -402,6 +422,7 @@ func buildStaticForwardRRSets(networks []sls_common.Network, hardware []sls_comm
 						},
 					},
 				}
+				addOwnershipComment(&primaryRRset)
 				staticRRSets = append(staticRRSets, primaryRRset)
 
 				// Now create CNAME records for each of the aliases.
@@ -427,6 +448,7 @@ func buildStaticForwardRRSets(networks []sls_common.Network, hardware []sls_comm
 							},
 						},
 					}
+					addOwnershipComment(&aliasRRset)
 					staticRRSets = append(staticRRSets, aliasRRset)
 				}
 				/*
@@ -459,6 +481,7 @@ func buildStaticForwardRRSets(networks []sls_common.Network, hardware []sls_comm
 							},
 						},
 					}
+					addOwnershipComment(&aliasRRset)
 					staticRRSets = append(staticRRSets, aliasRRset)
 
 					// If the HSN nic index is 0, create the extra nid record for the host
@@ -477,6 +500,7 @@ func buildStaticForwardRRSets(networks []sls_common.Network, hardware []sls_comm
 								},
 							},
 						}
+						addOwnershipComment(&aliasRRset)
 						staticRRSets = append(staticRRSets, aliasRRset)
 					}
 				case networkDomain == "chn":
@@ -502,6 +526,7 @@ func buildStaticForwardRRSets(networks []sls_common.Network, hardware []sls_comm
 							},
 						},
 					}
+					addOwnershipComment(&aliasRRset)
 					staticRRSets = append(staticRRSets, aliasRRset)
 
 				}
@@ -574,6 +599,7 @@ func buildDynamicReverseRRSets(networks []sls_common.Network, ethernetInterfaces
 							},
 						},
 					}
+					addOwnershipComment(&rrsetReverse)
 
 					dynamicRRSets = append(dynamicRRSets, rrsetReverse)
 
@@ -641,6 +667,7 @@ func buildStaticReverseRRSets(networks []sls_common.Network,
 								},
 							},
 						}
+						addOwnershipComment(&rrsetReverse)
 						staticReverseRRSets = append(staticReverseRRSets, rrsetReverse)
 					}
 				}
@@ -726,6 +753,7 @@ func buildDynamicForwardRRsets(hardware []sls_common.GenericHardware, networks [
 					},
 				},
 			}
+			addOwnershipComment(&primaryRRset)
 			dynamicRRSets = append(dynamicRRSets, primaryRRset)
 
 			// Now we can create CNAME records for all of the aliases.
@@ -757,6 +785,7 @@ func buildDynamicForwardRRsets(hardware []sls_common.GenericHardware, networks [
 						},
 					},
 				}
+				addOwnershipComment(&aliasRRset)
 				dynamicRRSets = append(dynamicRRSets, aliasRRset)
 			}
 		}
@@ -828,21 +857,28 @@ func trueUpRRSets(rrsets []powerdns.RRset, zones []*powerdns.Zone) (didSomething
 	for _, zoneRRset := range zoneRRsetMap {
 		_, found := desiredRRSetMap[*zoneRRset.Name]
 
-		if !found && zoneRRset.Type == powerdns.RRTypePtr(powerdns.RRTypeNS) {
-			patchLogger := logger.With(zap.Any("zoneRRset", zoneRRset))
-
-			// Need to identity which zone this record belongs to.
-			zoneName := common.GetZoneForRRSet(zoneRRset, zones)
-			if zoneName == nil {
-				patchLogger.Error("Desired RRSet did not match any master zones!", zap.Any("zones", zones))
+		if !found {
+			// Skip system records that should never be removed
+			if *zoneRRset.Type == powerdns.RRTypeSOA ||
+				(*zoneRRset.Type == powerdns.RRTypeNS && strings.HasSuffix(*zoneRRset.Name, ".")) {
 				continue
 			}
 
-			zoneSets := actionableRRSetMap[*zoneName].Sets
+			// Only remove RRsets that are owned by this manager
+			if isOwnedByManager(zoneRRset) {
+				patchLogger := logger.With(zap.Any("zoneRRset", zoneRRset))
 
-			zoneRRset.ChangeType = powerdns.ChangeTypePtr(powerdns.ChangeTypeDelete)
-			zoneSets = append(zoneSets, zoneRRset)
-			patchLogger.Info("RRset needs to be removed, adding to patch list.")
+				// Need to identity which zone this record belongs to.
+				zoneName := common.GetZoneForRRSet(zoneRRset, zones)
+				if zoneName == nil {
+					patchLogger.Error("Desired RRSet did not match any master zones!", zap.Any("zones", zones))
+					continue
+				}
+
+				zoneRRset.ChangeType = powerdns.ChangeTypePtr(powerdns.ChangeTypeDelete)
+				actionableRRSetMap[*zoneName].Sets = append(actionableRRSetMap[*zoneName].Sets, zoneRRset)
+				patchLogger.Info("RRset owned by manager needs to be removed, adding to patch list.")
+			}
 		}
 	}
 
@@ -1008,7 +1044,46 @@ func trueUpDNS() {
 
 		// At this point we have computed every correct RRSet necessary. Now the only task is to add the ones that are
 		// missing and remove the ones that shouldn't be there.
-		// TODO: Add the remove entries.
+
+		// Build a map of desired RRsets for faster lookups
+		desiredRRsetNames := make(map[string]bool)
+		for _, rrset := range finalRRSet {
+			desiredRRsetNames[*rrset.Name] = true
+		}
+
+		// Find RRsets that exist in zones but are not in our desired list
+		var obsoleteRRSets []powerdns.RRset
+		for _, zone := range allMasterZones {
+			for _, existingRRset := range zone.RRsets {
+				// Skip system records that should always exist
+				if *existingRRset.Type == powerdns.RRTypeSOA ||
+					(*existingRRset.Type == powerdns.RRTypeNS && *existingRRset.Name == *zone.Name) {
+					continue
+				}
+
+				// If this RRset doesn't exist in our desired list, check if we should delete it
+				if !desiredRRsetNames[*existingRRset.Name] {
+					// Only mark for deletion if this RRset is owned by the manager
+					if isOwnedByManager(existingRRset) {
+						deleteRRset := existingRRset
+						deleteRRset.ChangeType = powerdns.ChangeTypePtr(powerdns.ChangeTypeDelete)
+						obsoleteRRSets = append(obsoleteRRSets, deleteRRset)
+						logger.Debug("Marking manager-owned RRset for deletion",
+							zap.String("name", *existingRRset.Name),
+							zap.String("type", string(*existingRRset.Type)),
+							zap.String("zone", *zone.Name))
+					} else {
+						logger.Debug("Skipping non-manager-owned RRset",
+							zap.String("name", *existingRRset.Name),
+							zap.String("type", string(*existingRRset.Type)),
+							zap.String("zone", *zone.Name))
+					}
+				}
+			}
+		}
+
+		// Add obsolete RRsets to finalRRSet for processing by trueUpRRSets
+		finalRRSet = append(finalRRSet, obsoleteRRSets...)
 
 		// Force a sync to any slave servers if we did something.
 		if trueUpRRSets(finalRRSet, allMasterZones) {

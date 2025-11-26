@@ -46,6 +46,7 @@ func addOwnershipComment(rrset *powerdns.RRset) {
 	rrset.Comments = []powerdns.Comment{
 		{
 			Content: powerdns.String(ManagerOwnershipComment),
+			Account: powerdns.String("cray-powerdns-manager"),
 		},
 	}
 }

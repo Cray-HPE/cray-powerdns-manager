@@ -797,10 +797,11 @@ func buildDynamicForwardRRsets(hardware []sls_common.GenericHardware, networks [
 }
 
 // trueUpRRSets verifies all of the RRsets for the zone are as they should be.
-// There are a total of 3 possibilities for each RRset:
+// There are a total of 4 possibilities for each RRset:
 //  1. The RRset doesn't exist at all.
 //  2. The RRset exists but the records are not correct.
-//  3. The RRset exists and shouldn't.
+//  3. The RRset exists but is missing the ownership comment.
+//  4. The RRset exists and shouldn't.
 func trueUpRRSets(rrsets []powerdns.RRset, zones []*powerdns.Zone) (didSomething bool) {
 	// Main data structure to keep track of the RRsets we actually need to patch with the zone it should be added to.
 	actionableRRSetMap := make(map[string]*powerdns.RRsets)
@@ -842,9 +843,16 @@ func trueUpRRSets(rrsets []powerdns.RRset, zones []*powerdns.Zone) (didSomething
 
 		if found {
 			// Case 2 - is the RRSet correct?
-			if !common.RRsetsEqual(desiredRRset, zoneRRset) {
+			recordsDiffer := !common.RRsetsEqual(desiredRRset, zoneRRset)
+			missingOwnership := !isOwnedByManager(zoneRRset)
+
+			if recordsDiffer || missingOwnership {
 				*zoneSets = append(*zoneSets, desiredRRset)
-				patchLogger.Info("RRset exists but is not ideal configuration, adding to patch list.")
+				if recordsDiffer {
+					patchLogger.Info("RRset exists but is not ideal configuration, adding to patch list.")
+				} else {
+					patchLogger.Info("RRset exists but is missing ownership comment, adding to patch list.")
+				}
 			} else {
 				logger.Debug("RRset already at desired config", zap.Any("zoneRRset", zoneRRset))
 			}

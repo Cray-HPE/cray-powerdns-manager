@@ -863,7 +863,7 @@ func trueUpRRSets(rrsets []powerdns.RRset, zones []*powerdns.Zone) (didSomething
 		}
 	}
 
-	// Case 3 - should this exist?
+	// Case 4 - should this exist?
 	for _, zoneRRset := range zoneRRsetMap {
 		_, found := desiredRRSetMap[*zoneRRset.Name]
 

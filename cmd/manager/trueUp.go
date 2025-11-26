@@ -156,7 +156,7 @@ func trueUpMasterZones(baseDomain string, networks []sls_common.Network,
 		nameserverFQDNs := baseNameserverFQDNs
 		var nameserverRRSets []powerdns.RRset
 
-		// If this is is the base domain we need treat it a little differently in that we need to include RRsets for
+		// If this is the base domain we need to treat it a little differently in that we need to include RRsets for
 		// the A record of the master server otherwise it won't let us create the zone.
 		if masterZoneName == baseDomain {
 			nameserverRRSets = append(nameserverRRSets, masterNameserverRRSet)

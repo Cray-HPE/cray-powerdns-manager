@@ -182,6 +182,7 @@ func trueUpMasterZones(baseDomain string, networks []sls_common.Network,
 							},
 						},
 					}
+					addOwnershipComment(&ns)
 					nameserverRRSets = append(nameserverRRSets, ns)
 				}
 			}
@@ -1045,46 +1046,6 @@ func trueUpDNS() {
 
 		// At this point we have computed every correct RRSet necessary. Now the only task is to add the ones that are
 		// missing and remove the ones that shouldn't be there.
-
-		// Build a map of desired RRsets for faster lookups
-		desiredRRsetNames := make(map[string]bool)
-		for _, rrset := range finalRRSet {
-			desiredRRsetNames[*rrset.Name] = true
-		}
-
-		// Find RRsets that exist in zones but are not in our desired list
-		var obsoleteRRSets []powerdns.RRset
-		for _, zone := range allMasterZones {
-			for _, existingRRset := range zone.RRsets {
-				// Skip system records that should always exist
-				if *existingRRset.Type == powerdns.RRTypeSOA ||
-					(*existingRRset.Type == powerdns.RRTypeNS && *existingRRset.Name == *zone.Name) {
-					continue
-				}
-
-				// If this RRset doesn't exist in our desired list, check if we should delete it
-				if !desiredRRsetNames[*existingRRset.Name] {
-					// Only mark for deletion if this RRset is owned by the manager
-					if isOwnedByManager(existingRRset) {
-						deleteRRset := existingRRset
-						deleteRRset.ChangeType = powerdns.ChangeTypePtr(powerdns.ChangeTypeDelete)
-						obsoleteRRSets = append(obsoleteRRSets, deleteRRset)
-						logger.Debug("Marking manager-owned RRset for deletion",
-							zap.String("name", *existingRRset.Name),
-							zap.String("type", string(*existingRRset.Type)),
-							zap.String("zone", *zone.Name))
-					} else {
-						logger.Debug("Skipping non-manager-owned RRset",
-							zap.String("name", *existingRRset.Name),
-							zap.String("type", string(*existingRRset.Type)),
-							zap.String("zone", *zone.Name))
-					}
-				}
-			}
-		}
-
-		// Add obsolete RRsets to finalRRSet for processing by trueUpRRSets
-		finalRRSet = append(finalRRSet, obsoleteRRSets...)
 
 		// Force a sync to any slave servers if we did something.
 		if trueUpRRSets(finalRRSet, allMasterZones) {

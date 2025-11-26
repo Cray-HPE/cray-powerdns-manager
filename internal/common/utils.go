@@ -199,6 +199,12 @@ func GetNameserverRRset(nameserver Nameserver) powerdns.RRset {
 				Disabled: powerdns.Bool(false),
 			},
 		},
+		Comments: []powerdns.Comment{
+			{
+				Content: powerdns.String("managed by cray-powerdns-manager"),
+				Account: powerdns.String("cray-powerdns-manager"),
+			},
+		},
 	}
 }
 
@@ -215,6 +221,12 @@ func GetDNAMERRSet(masterZoneName string, baseDomain string, masterZoneNames []s
 					{
 						Content:  powerdns.String(MakeDomainCanonical(zone)),
 						Disabled: powerdns.Bool(false),
+					},
+				},
+				Comments: []powerdns.Comment{
+					{
+						Content: powerdns.String("managed by cray-powerdns-manager"),
+						Account: powerdns.String("cray-powerdns-manager"),
 					},
 				},
 			}

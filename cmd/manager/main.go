@@ -2,7 +2,7 @@
  *
  *  MIT License
  *
- *  (C) Copyright 2022 Hewlett Packard Enterprise Development LP
+ *  (C) Copyright 2022, 2025 Hewlett Packard Enterprise Development LP
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a
  *  copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,14 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"net/http"
+	"os"
+	"os/signal"
+	"strings"
+	"sync"
+	"syscall"
+	"time"
+
 	"github.com/Cray-HPE/cray-powerdns-manager/internal/common"
 	"github.com/Cray-HPE/cray-powerdns-manager/internal/httpLogger"
 	"github.com/gin-gonic/gin"
@@ -36,13 +44,11 @@ import (
 	"github.com/namsral/flag"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"net/http"
-	"os"
-	"os/signal"
-	"strings"
-	"sync"
-	"syscall"
-	"time"
+)
+
+const (
+	// ManagerOwnershipComment is the comment added to all RRsets managed by powerdns-manager
+	ManagerOwnershipComment = "managed by cray-powerdns-manager"
 )
 
 var (

@@ -2,7 +2,7 @@
  *
  *  MIT License
  *
- *  (C) Copyright 2022 Hewlett Packard Enterprise Development LP
+ *  (C) Copyright 2022, 2025 Hewlett Packard Enterprise Development LP
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a
  *  copy of this software and associated documentation files (the "Software"),
@@ -199,6 +199,12 @@ func GetNameserverRRset(nameserver Nameserver) powerdns.RRset {
 				Disabled: powerdns.Bool(false),
 			},
 		},
+		Comments: []powerdns.Comment{
+			{
+				Content: powerdns.String("managed by cray-powerdns-manager"),
+				Account: powerdns.String("cray-powerdns-manager"),
+			},
+		},
 	}
 }
 
@@ -215,6 +221,12 @@ func GetDNAMERRSet(masterZoneName string, baseDomain string, masterZoneNames []s
 					{
 						Content:  powerdns.String(MakeDomainCanonical(zone)),
 						Disabled: powerdns.Bool(false),
+					},
+				},
+				Comments: []powerdns.Comment{
+					{
+						Content: powerdns.String("managed by cray-powerdns-manager"),
+						Account: powerdns.String("cray-powerdns-manager"),
 					},
 				},
 			}
